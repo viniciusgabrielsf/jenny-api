@@ -1,0 +1,9 @@
+# docker-compose.prod.yml
+version: '3.8'
+services:
+    app:
+        #... your Node.js app container configuration...
+        networks:
+            - app-network
+    db:
+        # No port mapping for enhanced security

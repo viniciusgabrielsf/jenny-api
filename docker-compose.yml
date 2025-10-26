@@ -1,0 +1,19 @@
+# docker-compose.yml (base config)
+version: '3.8'
+services:
+  db:
+    image: postgres:16-alpine
+    restart: always
+    container_name: ${DB_CONTAINER_NAME}
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - app-network
+volumes:
+  pgdata:
+networks:
+  app-network:
