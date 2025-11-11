@@ -6,6 +6,7 @@ import { setupSwagger } from './config/swagger';
 import { routeNotFound } from './config/middleware/route-not-found.middleware';
 import { errorHandler } from './config/middleware/error-handler.middleware';
 import morgan from 'morgan';
+import { setupSequelize } from './config/db';
 
 dotenv.config();
 
@@ -20,6 +21,8 @@ app.use(morgan(':method :url :status :response-time ms - :res[content-length]'))
 app.use(express.static('public'));
 
 setupSwagger(app);
+
+setupSequelize();
 
 app.use(cors());
 
