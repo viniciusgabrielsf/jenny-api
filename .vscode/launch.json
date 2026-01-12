@@ -1,0 +1,22 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "debug",
+            "type": "node",
+            "request": "launch",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": ["run", "debug"],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "name": "Attach to process",
+            "type": "node",
+            "request": "attach",
+            "restart": true,
+            "localRoot": "${workspaceFolder}",
+            "remoteRoot": "${workspaceFolder}"
+        }
+    ]
+}
