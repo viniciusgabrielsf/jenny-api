@@ -5,8 +5,6 @@ export class UsersController {
     constructor(private usersService: UsersService) {}
 
     getUsers = async (req: Request, res: Response): Promise<void> => {
-        console.log('Fetching users...');
-
         const users = await this.usersService.getUsers({
             attributes: { exclude: ['passwordHash', 'createdAt', 'updatedAt'] },
         });
@@ -16,11 +14,11 @@ export class UsersController {
     };
 
     creatUser = async (req: Request, res: Response): Promise<void> => {
-        const { name, email, password } = req.body;
+        const { fullName, email, birthDate, password } = req.body;
 
-        const newUser = await this.usersService.createUser(name, email, password);
+        await this.usersService.createUser(fullName, email, birthDate, password);
 
         res.status(201);
-        res.json(newUser);
+        res.json({ message: 'User created successfully' });
     };
 }

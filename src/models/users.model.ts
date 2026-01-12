@@ -83,8 +83,8 @@ export default class Users extends Model {
     @Column({ field: 'full_name', allowNull: false, type: DataTypes.TEXT })
     fullName!: string;
 
-    @Column({ allowNull: false, type: DataTypes.TEXT, unique: true })
     @IsEmail
+    @Column({ allowNull: false, type: DataTypes.TEXT, unique: true })
     email!: string;
 
     @Column({ field: 'birth_date', allowNull: false, type: DataTypes.DATEONLY })
@@ -121,6 +121,14 @@ export default class Users extends Model {
     @BeforeUpdate
     static validateFullName(instance: Users): void {
         instance.fullName = instance.fullName.trim();
+
+        if (instance.fullName.length < 3) {
+            throw new BadRequestException('Full name must be at least 3 characters long');
+        }
+
+        if (instance.fullName.length > 100) {
+            throw new BadRequestException('Full name must be less than 100 characters');
+        }
 
         if (!instance.fullName) {
             throw new BadRequestException('Full name is required');
