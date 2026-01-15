@@ -1,7 +1,7 @@
 import { mockSequelizeTypescript } from '../../ mocks/sequelize-typescript.mock';
 mockSequelizeTypescript();
 
-import Users from '../../../models/users.model';
+import User from '../../../models/user.model';
 import { BadRequestException } from '../../../helpers/exceptions/bad-request.exception';
 import * as bcrypt from 'bcryptjs';
 
@@ -11,7 +11,7 @@ jest.mock('bcryptjs', () => ({
     compare: jest.fn().mockResolvedValue(true),
 }));
 
-describe('Users model hooks and methods', () => {
+describe('User model hooks and methods', () => {
     const originalNow = Date.now;
 
     beforeEach(() => {
@@ -28,13 +28,13 @@ describe('Users model hooks and methods', () => {
     it('validateEmail throws on missing', () => {
         const instMissing: any = { email: '' };
 
-        expect(() => Users.validateEmail(instMissing)).toThrow(BadRequestException);
+        expect(() => User.validateEmail(instMissing)).toThrow(BadRequestException);
     });
 
     it('validateEmail throws on invalid', () => {
         const instBad: any = { email: 'not-an-email' };
 
-        expect(() => Users.validateEmail(instBad)).toThrow(BadRequestException);
+        expect(() => User.validateEmail(instBad)).toThrow(BadRequestException);
     });
 
     it('validateEmail trims and lowercases', () => {
@@ -42,7 +42,7 @@ describe('Users model hooks and methods', () => {
             email: '  KillUa@ZoldyCK.COM  ',
         };
 
-        Users.validateEmail(inst);
+        User.validateEmail(inst);
 
         expect(inst.email).toBe('killua@zoldyck.com');
     });
@@ -50,13 +50,13 @@ describe('Users model hooks and methods', () => {
     it('validateFullName throws when empty', () => {
         const instEmpty: any = { fullName: '   ' };
 
-        expect(() => Users.validateFullName(instEmpty)).toThrow(BadRequestException);
+        expect(() => User.validateFullName(instEmpty)).toThrow(BadRequestException);
     });
 
     it('validateFullName trims', () => {
         const inst: any = { fullName: '  Gon Freecss  ' };
 
-        Users.validateFullName(inst);
+        User.validateFullName(inst);
 
         expect(inst.fullName).toBe('Gon Freecss');
     });
@@ -64,25 +64,25 @@ describe('Users model hooks and methods', () => {
     it('validateBirthDate throws when missing', () => {
         const instMissing: any = { birthDate: null };
 
-        expect(() => Users.validateBirthDate(instMissing)).toThrow(BadRequestException);
+        expect(() => User.validateBirthDate(instMissing)).toThrow(BadRequestException);
     });
 
     it('validateBirthDate throws when in the future', () => {
         // Date.now fixed to 2025-01-01)
         const instFuture: any = { birthDate: new Date('2030-01-01') };
-        expect(() => Users.validateBirthDate(instFuture)).toThrow(BadRequestException);
+        expect(() => User.validateBirthDate(instFuture)).toThrow(BadRequestException);
     });
 
     it('validateBirthDate throws when in the future', () => {
         const inst: any = { birthDate: new Date('2000-01-01') };
 
-        expect(() => Users.validateBirthDate(inst)).not.toThrow();
+        expect(() => User.validateBirthDate(inst)).not.toThrow();
     });
 
     it('hashPassword hashes the passwordHash with bcrypt', async () => {
         const inst: any = { passwordHash: 'plainPassword' };
 
-        await Users.hashPassword(inst);
+        await User.hashPassword(inst);
 
         expect(bcrypt.genSalt).toHaveBeenCalledWith(10);
         expect(bcrypt.hash).toHaveBeenCalledWith('plainPassword', 'mockSalt');
@@ -95,9 +95,9 @@ describe('Users model hooks and methods', () => {
             changed: jest.fn().mockReturnValue(false),
         };
 
-        const spy2 = jest.spyOn(Users, 'hashPassword').mockResolvedValue(undefined);
+        const spy2 = jest.spyOn(User, 'hashPassword').mockResolvedValue(undefined);
 
-        await Users.hashPasswordOnUpdate(instNotChanged);
+        await User.hashPasswordOnUpdate(instNotChanged);
 
         expect(instNotChanged.changed).toHaveBeenCalledWith('passwordHash');
         expect(spy2).not.toHaveBeenCalled();
@@ -109,9 +109,9 @@ describe('Users model hooks and methods', () => {
             changed: jest.fn().mockReturnValue(true),
         };
 
-        const spy = jest.spyOn(Users, 'hashPassword').mockResolvedValue(undefined);
+        const spy = jest.spyOn(User, 'hashPassword').mockResolvedValue(undefined);
 
-        await Users.hashPasswordOnUpdate(instChanged);
+        await User.hashPasswordOnUpdate(instChanged);
 
         expect(instChanged.changed).toHaveBeenCalledWith('passwordHash');
         expect(spy).toHaveBeenCalledWith(instChanged);
@@ -120,7 +120,7 @@ describe('Users model hooks and methods', () => {
     it('checkPassword uses bcrypt.compare and returns true if ok', async () => {
         const inst: any = { passwordHash: 'mockHashedPassword' };
 
-        const ok = await Users.prototype.checkPassword.call(inst, 'plain');
+        const ok = await User.prototype.checkPassword.call(inst, 'plain');
         expect(bcrypt.compare).toHaveBeenCalledWith('plain', 'mockHashedPassword');
         expect(ok).toBe(true);
     });
@@ -129,7 +129,7 @@ describe('Users model hooks and methods', () => {
         const inst: any = { passwordHash: 'mockHashedPassword' };
 
         (bcrypt.compare as jest.Mock).mockResolvedValueOnce(false);
-        const notOk = await Users.prototype.checkPassword.call(inst, 'wrong');
+        const notOk = await User.prototype.checkPassword.call(inst, 'wrong');
         expect(notOk).toBe(false);
     });
 });

@@ -13,7 +13,7 @@ import { BadRequestException } from '../helpers/exceptions/bad-request.exception
 import * as bcrypt from 'bcryptjs';
 
 // export const User = sequelize.define(
-//     'users',
+//     'user_account',
 //     {
 //         id: {
 //             type: DataTypes.UUIDV4,
@@ -60,7 +60,7 @@ import * as bcrypt from 'bcryptjs';
 //     }
 // );
 
-export type User = {
+export type IUser = {
     id: string;
     fullName: string;
     email: string;
@@ -70,8 +70,8 @@ export type User = {
     updatedAt: Date;
 };
 
-@Table({ tableName: 'users', timestamps: true })
-export default class Users extends Model {
+@Table({ tableName: 'user_account', timestamps: true })
+export default class User extends Model {
     @Column({
         allowNull: false,
         type: DataTypes.UUIDV4,
@@ -103,7 +103,7 @@ export default class Users extends Model {
 
     @BeforeCreate
     @BeforeUpdate
-    static validateEmail(instance: Users): void {
+    static validateEmail(instance: User): void {
         const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+/;
 
         instance.email = instance.email.toLowerCase().trim();
@@ -119,7 +119,7 @@ export default class Users extends Model {
 
     @BeforeCreate
     @BeforeUpdate
-    static validateFullName(instance: Users): void {
+    static validateFullName(instance: User): void {
         instance.fullName = instance.fullName.trim();
 
         if (instance.fullName.length < 3) {
@@ -137,7 +137,7 @@ export default class Users extends Model {
 
     @BeforeCreate
     @BeforeUpdate
-    static validateBirthDate(instance: Users): void {
+    static validateBirthDate(instance: User): void {
         if (!instance.birthDate) {
             throw new BadRequestException('Birth date is required');
         }
@@ -149,18 +149,18 @@ export default class Users extends Model {
     }
 
     @BeforeCreate
-    static async hashPassword(instance: Users) {
+    static async hashPassword(instance: User) {
         const salt = await bcrypt.genSalt(10);
         instance.passwordHash = await bcrypt.hash(instance.passwordHash, salt);
     }
 
     @BeforeUpdate
-    static async hashPasswordOnUpdate(instance: Users) {
+    static async hashPasswordOnUpdate(instance: User) {
         if (!instance.changed('passwordHash')) {
             return;
         }
 
-        Users.hashPassword(instance);
+        User.hashPassword(instance);
     }
 
     async checkPassword(password: string): Promise<boolean> {
