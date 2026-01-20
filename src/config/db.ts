@@ -26,9 +26,10 @@ export const setupSequelize = async () => {
             throw err;
         });
 
-    sequelize.sync().then(() => {
-        console.log('💾 Sequelize: All models were synchronized successfully.');
-    });
+    // REMOVING SYNC TO AVOID DATA LOSS, USE TRANSACTIONS IF NEEDED TO ALTER SCHEMA
+    // sequelize.sync().then(() => {
+    //     console.log('💾 Sequelize: All models were synchronized successfully.');
+    // });
 };
 
 const db = {
