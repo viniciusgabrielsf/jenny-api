@@ -2,6 +2,7 @@ import moment from 'moment';
 import { BadRequestException } from '../../../helpers/exceptions/bad-request.exception';
 import User from '../../../models/user.model';
 import { UsersService } from '../../../services/users.service';
+import { NotFoundException } from '../../../helpers/exceptions/not-found.exception';
 
 const mockFindOne = jest.fn();
 const mockCreate = jest.fn();
@@ -77,5 +78,33 @@ describe('UsersService (Unit Test)', () => {
             passwordHash: userData.password,
         });
         expect(result).toEqual(userResult);
+    });
+
+    it('getUser should throw error if user not found', async () => {
+        mockFindOne.mockResolvedValueOnce(null);
+        const userId = 1;
+
+        const resultPromise = usersService.getUser(userId);
+
+        expect(mockFindOne).toHaveBeenCalledWith({ where: { id: userId } });
+        await expect(resultPromise).rejects.toThrow(new NotFoundException('User not found'));
+    });
+
+    it('getUser should return user if found', async () => {
+        const user = {
+            id: 1,
+            fullName: 'killua@zoldyck.com',
+            email: 'Killua Zoldyck',
+            birthDate: moment('2000-01-01', 'YYYY-MM-DD').toDate(),
+            passwordHash: 'GonsBestFriend123',
+        };
+
+        mockFindOne.mockResolvedValueOnce(user);
+
+        const result = await usersService.getUser(user.id);
+
+        expect(mockFindOne).toHaveBeenCalledWith({ where: { id: user.id } });
+
+        expect(result).toEqual(user);
     });
 });
