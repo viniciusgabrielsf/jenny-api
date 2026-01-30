@@ -35,4 +35,33 @@ export class UsersController {
         res.status(200);
         res.json(user);
     };
+
+    updateUser = async (req: Request, res: Response): Promise<void> => {
+        const userId = req.user?.id;
+        if (!userId) throw new NotFoundException('User not found');
+
+        const { fullName, email, birthDate, avatar } = req.body;
+
+        await this.usersService.updateUser(userId, {
+            fullName,
+            email,
+            birthDate,
+            avatar,
+        });
+
+        res.status(200);
+        res.json({ message: 'User updated successfully' });
+    };
+
+    updatePassword = async (req: Request, res: Response): Promise<void> => {
+        const userId = req.user?.id;
+        if (!userId) throw new NotFoundException('User not found');
+
+        const { oldPassword, newPassword } = req.body;
+
+        await this.usersService.updatePassword(userId, oldPassword, newPassword);
+
+        res.status(200);
+        res.json({ message: 'Password updated successfully' });
+    };
 }

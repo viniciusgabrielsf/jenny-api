@@ -42,4 +42,42 @@ export class UsersService {
 
         return existingUser;
     }
+
+    async updateUser(
+        id: number,
+        updates: Partial<Omit<User, 'id' | 'createdAt' | 'updatedAt' | 'passwordHash'>>
+    ): Promise<void> {
+        const user = await User.findOne({ where: { id } });
+
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        if (user.email !== updates.email) {
+            const emailExists = await User.findOne({ where: { email: updates.email } });
+
+            if (emailExists) throw new BadRequestException('Email already in use');
+        }
+
+        await User.update(updates, { where: { id } });
+    }
+
+    updatePassword = async (
+        userId: number,
+        oldPassword: string,
+        newPassword: string
+    ): Promise<void> => {
+        const user = await User.findOne({ where: { id: userId } });
+
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        if (!(await user.checkPassword(oldPassword))) {
+            throw new BadRequestException('Old password is incorrect');
+        }
+
+        user.passwordHash = newPassword;
+        await user.save();
+    };
 }

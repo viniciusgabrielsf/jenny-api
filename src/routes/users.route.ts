@@ -8,5 +8,7 @@ const usersController = new UsersController(new UsersService());
 
 router.post('/', usersController.createUser);
 router.get('/me', authentication, usersController.getCurrentUser);
+router.patch('/me', authentication, usersController.updateUser);
+router.patch('/me/password', authentication, usersController.updatePassword);
 
 export default router;

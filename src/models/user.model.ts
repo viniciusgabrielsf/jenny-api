@@ -66,6 +66,7 @@ export type IUser = {
     email: string;
     birthDate: Date;
     passwordHash: string;
+    avatar?: string;
     createdAt: Date;
     updatedAt: Date;
 };
@@ -92,6 +93,9 @@ export default class User extends Model {
 
     @Column({ field: 'password_hash', allowNull: false, type: DataTypes.TEXT })
     passwordHash!: string;
+
+    @Column({ field: 'avatar', allowNull: true, type: DataTypes.TEXT })
+    avatar?: string;
 
     @Column({ field: 'created_at', allowNull: false, type: DataTypes.DATE })
     @CreatedAt
@@ -160,7 +164,7 @@ export default class User extends Model {
             return;
         }
 
-        User.hashPassword(instance);
+        await User.hashPassword(instance);
     }
 
     async checkPassword(password: string): Promise<boolean> {
