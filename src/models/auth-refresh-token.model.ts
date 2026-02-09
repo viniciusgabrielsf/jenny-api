@@ -1,7 +1,7 @@
 import { DataTypes } from 'sequelize';
 import { Table, Model, Column, CreatedAt, UpdatedAt } from 'sequelize-typescript';
 
-export type ISessionRefreshToken = {
+export type IAuthRefreshToken = {
     id: string;
     token: string;
     userId: string;
