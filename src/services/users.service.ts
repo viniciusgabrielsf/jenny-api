@@ -20,7 +20,7 @@ export class UsersService {
         const existingUser = await User.findOne({ where: { email } });
 
         if (existingUser) {
-            throw new BadRequestException('Email already in use');
+            throw new BadRequestException('Email já está em uso');
         }
 
         const newUser = await User.create({
@@ -37,7 +37,7 @@ export class UsersService {
         const existingUser = await User.findOne({ ...options, where: { id } });
 
         if (!existingUser) {
-            throw new NotFoundException('User not found');
+            throw new NotFoundException('Usuário não encontrado');
         }
 
         return existingUser;
@@ -50,13 +50,13 @@ export class UsersService {
         const user = await User.findOne({ where: { id } });
 
         if (!user) {
-            throw new NotFoundException('User not found');
+            throw new NotFoundException('Usuário não encontrado');
         }
 
         if (user.email !== updates.email) {
             const emailExists = await User.findOne({ where: { email: updates.email } });
 
-            if (emailExists) throw new BadRequestException('Email already in use');
+            if (emailExists) throw new BadRequestException('Email já está em uso');
         }
 
         await User.update(updates, { where: { id } });
@@ -70,11 +70,11 @@ export class UsersService {
         const user = await User.findOne({ where: { id: userId } });
 
         if (!user) {
-            throw new NotFoundException('User not found');
+            throw new NotFoundException('Usuário não encontrado');
         }
 
         if (!(await user.checkPassword(oldPassword))) {
-            throw new BadRequestException('Old password is incorrect');
+            throw new BadRequestException('Senha antiga está incorreta');
         }
 
         user.passwordHash = newPassword;

@@ -26,7 +26,7 @@ export class AuthService {
         const user = await User.findOne({ where: { email } });
 
         if (!user || !(await user.checkPassword(password))) {
-            throw new UnauthorizedException('Invalid credentials');
+            throw new UnauthorizedException('Credenciais inválidas');
         }
 
         const familyId = uuidv4();
@@ -58,7 +58,7 @@ export class AuthService {
             });
 
             if (!storedToken) {
-                throw new UnauthorizedException('Invalid token');
+                throw new UnauthorizedException('Token inválido');
             }
 
             if (storedToken.isRevoked) {
@@ -68,13 +68,13 @@ export class AuthService {
                     { where: { familyId: storedToken.familyId } }
                 );
 
-                throw new UnauthorizedException('Invalid token');
+                throw new UnauthorizedException('Token inválido');
             }
 
             const user = await User.findOne({
                 where: { id: storedToken.userId },
             });
-            if (!user) throw new UnauthorizedException('User not found');
+            if (!user) throw new UnauthorizedException('Usuário não encontrado');
 
             const newAccessToken = AuthTokensService.generateAccessToken(user.id);
             const newRefreshToken = AuthTokensService.generateRefreshToken(user.id);
@@ -99,7 +99,7 @@ export class AuthService {
         } catch (err) {
             if (err instanceof HttpException) throw err;
 
-            throw new UnauthorizedException('Invalid token');
+            throw new UnauthorizedException('Token inválido');
         }
     };
 

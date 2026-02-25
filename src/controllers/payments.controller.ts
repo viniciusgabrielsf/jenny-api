@@ -10,19 +10,19 @@ export class PaymentsController {
 
     getMyPayments = async (req: Request, res: Response): Promise<void> => {
         const userId = req.user?.id;
-        if (!userId) throw new NotFoundException('User not found');
+        if (!userId) throw new NotFoundException('Usuário não encontrado');
         let filter, options;
 
         try {
             filter = myPaymentsFilterSchema.parse({ ...req.params, userId });
             options = getOptionsSchema.parse(req.params);
         } catch (error) {
-            throw new BadRequestException('Invalid query parameters');
+            throw new BadRequestException('Parâmetros de consulta inválidos');
         }
 
         const payments = await this.paymentsService.getPayments({ ...options, filter });
 
-        if (!payments) throw new NotFoundException('Payments not found');
+        if (!payments) throw new NotFoundException('Pagamentos não encontrados');
 
         res.status(200);
         res.json(payments);

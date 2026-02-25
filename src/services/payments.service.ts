@@ -32,7 +32,7 @@ export class PaymentsService {
         const payment = await Payment.findOne({ where: { id } });
 
         if (!payment) {
-            throw new NotFoundException('Payment not found');
+            throw new NotFoundException('Pagamento não encontrado');
         }
 
         await Payment.update(updates, { where: { id } });
@@ -45,7 +45,7 @@ export class PaymentsService {
         const existingPayment = await Payment.findOne({ ...options, where: { id } });
 
         if (!existingPayment) {
-            throw new NotFoundException('Payment not found');
+            throw new NotFoundException('Pagamento não encontrado');
         }
 
         return existingPayment;

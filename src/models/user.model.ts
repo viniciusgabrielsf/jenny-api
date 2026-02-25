@@ -113,11 +113,11 @@ export default class User extends Model {
         instance.email = instance.email.toLowerCase().trim();
 
         if (!instance.email) {
-            throw new BadRequestException('Email is required');
+            throw new BadRequestException('Email é obrigatório');
         }
 
         if (!emailPattern.test(instance.email)) {
-            throw new BadRequestException('Invalid email');
+            throw new BadRequestException('Email inválido');
         }
     }
 
@@ -127,15 +127,15 @@ export default class User extends Model {
         instance.fullName = instance.fullName.trim();
 
         if (instance.fullName.length < 3) {
-            throw new BadRequestException('Full name must be at least 3 characters long');
+            throw new BadRequestException('Nome completo deve ter pelo menos 3 caracteres');
         }
 
         if (instance.fullName.length > 100) {
-            throw new BadRequestException('Full name must be less than 100 characters');
+            throw new BadRequestException('Nome completo deve ter menos de 100 caracteres');
         }
 
         if (!instance.fullName) {
-            throw new BadRequestException('Full name is required');
+            throw new BadRequestException('Nome completo é obrigatório');
         }
     }
 
@@ -143,12 +143,12 @@ export default class User extends Model {
     @BeforeUpdate
     static validateBirthDate(instance: User): void {
         if (!instance.birthDate) {
-            throw new BadRequestException('Birth date is required');
+            throw new BadRequestException('Data de nascimento é obrigatória');
         }
 
         const today = new Date();
         if (instance.birthDate >= today) {
-            throw new BadRequestException('Birth date must be in the past');
+            throw new BadRequestException('Data de nascimento deve ser no passado');
         }
     }
 

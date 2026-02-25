@@ -19,18 +19,18 @@ export class UsersController {
         await this.usersService.createUser(fullName, email, birthDate, password);
 
         res.status(201);
-        res.json({ message: 'User created successfully' });
+        res.json({ message: 'Usuário criado com sucesso' });
     };
 
     getCurrentUser = async (req: Request, res: Response): Promise<void> => {
         const userId = req.user?.id;
-        if (!userId) throw new NotFoundException('User not found');
+        if (!userId) throw new NotFoundException('Usuário não encontrado');
 
         const user = await this.usersService.getUser(userId, {
             attributes: { exclude: ['passwordHash', 'createdAt', 'updatedAt'] },
         });
 
-        if (!user) throw new NotFoundException('User not found');
+        if (!user) throw new NotFoundException('Usuário não encontrado');
 
         res.status(200);
         res.json(user);
@@ -38,7 +38,7 @@ export class UsersController {
 
     updateUser = async (req: Request, res: Response): Promise<void> => {
         const userId = req.user?.id;
-        if (!userId) throw new NotFoundException('User not found');
+        if (!userId) throw new NotFoundException('Usuário não encontrado');
 
         const { fullName, email, birthDate, avatar } = req.body;
 
@@ -50,18 +50,18 @@ export class UsersController {
         });
 
         res.status(200);
-        res.json({ message: 'User updated successfully' });
+        res.json({ message: 'Usuário atualizado com sucesso' });
     };
 
     updatePassword = async (req: Request, res: Response): Promise<void> => {
         const userId = req.user?.id;
-        if (!userId) throw new NotFoundException('User not found');
+        if (!userId) throw new NotFoundException('Usuário não encontrado');
 
         const { oldPassword, newPassword } = req.body;
 
         await this.usersService.updatePassword(userId, oldPassword, newPassword);
 
         res.status(200);
-        res.json({ message: 'Password updated successfully' });
+        res.json({ message: 'Senha atualizada com sucesso' });
     };
 }

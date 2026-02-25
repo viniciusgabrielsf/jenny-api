@@ -10,7 +10,7 @@ export class AuthController {
     logIn = async (req: Request, res: Response): Promise<void> => {
         const { email, password } = req.body;
         if (!email || !password) {
-            throw new BadRequestException('Email and password are required');
+            throw new BadRequestException('Email e senha são obrigatórios');
         }
 
         const { accessToken, refreshToken, user } = await this.authService.logIn(email, password);
@@ -28,7 +28,7 @@ export class AuthController {
     refresh = async (req: Request, res: Response): Promise<void> => {
         const incomingRefreshToken = req.cookies?.refreshToken;
 
-        if (!incomingRefreshToken) throw new UnauthorizedException('No token provided');
+        if (!incomingRefreshToken) throw new UnauthorizedException('Nenhum token fornecido');
 
         try {
             const { accessToken, refreshToken } =
@@ -36,7 +36,7 @@ export class AuthController {
 
             AuthTokensService.setAuthCookies(res, accessToken, refreshToken);
 
-            res.status(200).json({ message: 'refreshed tokens' });
+            res.status(200).json({ message: 'tokens atualizados com sucesso' });
         } catch (error) {
             AuthTokensService.clearAuthCookies(res);
             throw error;
@@ -50,6 +50,6 @@ export class AuthController {
 
         AuthTokensService.clearAuthCookies(res);
 
-        res.status(200).json({ message: 'logged out' });
+        res.status(200).json({ message: 'logout realizado com sucesso' });
     };
 }

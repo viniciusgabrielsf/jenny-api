@@ -8,7 +8,7 @@ export function authentication(req: Request, res: Response, next: NextFunction) 
     let token = req.cookies?.accessToken;
 
     if (!token) {
-        throw new UnauthorizedException('Authentication token missing');
+        throw new UnauthorizedException('Token de autenticação não fornecido');
     }
 
     try {
@@ -21,7 +21,7 @@ export function authentication(req: Request, res: Response, next: NextFunction) 
 
         next();
     } catch (error) {
-        throw new UnauthorizedException('Invalid or expired token');
+        throw new UnauthorizedException('Token inválido ou expirado');
     }
 }
 
@@ -30,7 +30,7 @@ export function authentication(req: Request, res: Response, next: NextFunction) 
 // export const requireRole = (role: string) => {
 //     return (req: Request, res: Response, next: NextFunction) => {
 //         if (!req.user) {
-//             throw new ForbiddenException('Insufficient permissions');
+//             throw new ForbiddenException('Permissões insuficientes');
 //         }
 //         next();
 //     };
