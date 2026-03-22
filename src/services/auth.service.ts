@@ -7,6 +7,7 @@ import { env } from '../config/env';
 import jwt from 'jsonwebtoken';
 import { HttpException } from '../helpers/exceptions/http.exception';
 import { timeStringToMilliseconds } from '../helpers/time-to-miliseconds.helper';
+import { BadRequestException } from '../helpers/exceptions/bad-request.exception';
 
 export interface ILoginResult {
     accessToken: string;
@@ -26,7 +27,7 @@ export class AuthService {
         const user = await User.findOne({ where: { email } });
 
         if (!user || !(await user.checkPassword(password))) {
-            throw new UnauthorizedException('Credenciais inválidas');
+            throw new BadRequestException('Credenciais inválidas');
         }
 
         const familyId = uuidv4();
