@@ -22,6 +22,7 @@ export class AuthController {
             email: user.email,
             fullName: user.fullName,
             birthDate: user.birthDate,
+            avatar: user.avatar,
         });
     };
 
