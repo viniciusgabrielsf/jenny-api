@@ -17,6 +17,12 @@
             "restart": true,
             "localRoot": "${workspaceFolder}",
             "remoteRoot": "${workspaceFolder}"
+        },
+        {
+            "name": "Zshtest",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "npm run debug"
         }
     ]
 }
