@@ -1,6 +1,6 @@
 ---
-name: testing-standards
-description: 'Standardize unit vs integration tests in src/__tests__ for Jenny API. Use when adding or updating tests, choosing test type, or setting up Jest test structure.'
+name: backend-testing
+description: 'Standardize unit and integration tests in src/__tests__ for Jenny API. Use when adding or updating tests, choosing test type, or setting up Jest test structure.'
 argument-hint: 'What to test and the level (unit or integration)'
 ---
 
