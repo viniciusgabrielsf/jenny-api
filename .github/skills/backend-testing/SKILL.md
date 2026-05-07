@@ -1,6 +1,6 @@
 ---
-name: testing-standards
-description: 'Standardize unit vs integration tests in src/__tests__ for Jenny API. Use when adding or updating tests, choosing test type, or setting up Jest test structure.'
+name: backend-testing
+description: 'Standardize unit and integration tests in src/__tests__ for Jenny API. Use when adding or updating tests, choosing test type, or setting up Jest test structure.'
 argument-hint: 'What to test and the level (unit or integration)'
 ---
 
@@ -15,7 +15,7 @@ argument-hint: 'What to test and the level (unit or integration)'
 ## Decision Guide
 
 - Unit test: isolated logic (helpers, model hooks, service logic). Mock DB/models/external libs.
-- Integration test: route + middleware + service flow. Use the real Express app and avoid mocking the core layers.
+- Integration test: route + middleware + service flow. Use the real Express app and avoid mocking the core layers. You can mock the DB or external services if needed, but not the app's internal logic.
 
 ## Placement and Naming
 
