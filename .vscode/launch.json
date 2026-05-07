@@ -3,11 +3,9 @@
     "configurations": [
         {
             "name": "debug",
-            "type": "node",
+            "type": "node-terminal",
             "request": "launch",
-            "runtimeExecutable": "npm",
-            "runtimeArgs": ["run", "debug"],
-            "console": "integratedTerminal",
+            "command": "npm run debug",
             "cwd": "${workspaceFolder}"
         },
         {
