@@ -51,21 +51,94 @@ export class PaymentsService {
         return existingPayment;
     }
 
-    async getPayments(options?: IGetOptions<MyPaymentsFilterSchemaType>): Promise<IPayment[]> {
-        const findOptions = this.buildFindOptions(options);
+    // TODO define tiype of balances
+    async getPayments(
+        options?: IGetOptions<MyPaymentsFilterSchemaType>
+    ): Promise<{ items: IPayment[]; total: number; balances: any[] }> {
+        // const findOptions = this.buildFindOptions(options);
 
-        const payments = await Payment.findAll(findOptions);
+        // const payments = await Payment.findAndCountAll(findOptions);
 
-        return payments;
+        const payments = [
+            {
+                id: '1',
+                userId: '95485d7a-9c06-49a4-a7b9-72db266cf18e',
+                partakers: [
+                    '95485d7a-9c06-49a4-a7b9-72db266cf18e',
+                    '6ae007c3-ba3f-48ad-aa7d-ffbf0d6ccdbd',
+                    '90920d0a-8e42-4b46-aa89-d68b97525375',
+                    'd5b109c9-10f5-4a1f-ba5c-d6478170d39e',
+                ],
+                title: 'Pagamento de teste',
+                amount: 100.0,
+                paymentDate: new Date(),
+                category: 'alimentação',
+                status: 'pendente',
+            },
+            {
+                id: '2',
+                userId: '6ae007c3-ba3f-48ad-aa7d-ffbf0d6ccdbd',
+                partakers: [
+                    '95485d7a-9c06-49a4-a7b9-72db266cf18e',
+                    '6ae007c3-ba3f-48ad-aa7d-ffbf0d6ccdbd',
+                    '90920d0a-8e42-4b46-aa89-d68b97525375',
+                    'd5b109c9-10f5-4a1f-ba5c-d6478170d39e',
+                ],
+                title: 'Pagamento de teste',
+                amount: 100.0,
+                paymentDate: new Date(),
+                category: 'alimentação',
+                status: 'pendente',
+            },
+            {
+                id: '3',
+                userId: '90920d0a-8e42-4b46-aa89-d68b97525375',
+                partakers: [
+                    '95485d7a-9c06-49a4-a7b9-72db266cf18e',
+                    '6ae007c3-ba3f-48ad-aa7d-ffbf0d6ccdbd',
+                    '90920d0a-8e42-4b46-aa89-d68b97525375',
+                    'd5b109c9-10f5-4a1f-ba5c-d6478170d39e',
+                ],
+                title: 'Pagamento de teste',
+                amount: 100.0,
+                paymentDate: new Date(),
+                category: 'alimentação',
+                status: 'pendente',
+            },
+        ];
+
+        return {
+            items: payments.map(
+                payment =>
+                    ({
+                        id: payment.id,
+                        userId: payment.userId,
+                        title: payment.title,
+                        amount: payment.amount,
+                        paymentDate: payment.paymentDate,
+                        category: payment.category,
+                        status: payment.status,
+                    }) as IPayment
+            ),
+            total: 3,
+            balances: this.settleUpPayments(payments),
+        };
     }
 
     buildFindOptions = (options?: IGetOptions<MyPaymentsFilterSchemaType>): FindOptions => {
         const findOptions: FindOptions = buildBaseFindOptions(options);
+        findOptions.where = {};
         const filters = options?.filter;
 
-        if (filters) {
-            findOptions.where = {};
+        const referenceDate = filters?.date ? moment(filters.date) : moment();
+        const monthStart = referenceDate.clone().startOf('month').toDate();
+        const monthEnd = referenceDate.clone().endOf('month').toDate();
 
+        findOptions.where['paymentDate'] = {
+            [Op.and]: [{ [Op.gte]: monthStart }, { [Op.lte]: monthEnd }],
+        };
+
+        if (filters) {
             if (filters.userId) findOptions.where['userId'] = filters.userId;
             if (filters.title) findOptions.where['title'] = { [Op.like]: `%${filters.title}%` };
             if (filters.category) findOptions.where['category'] = filters.category;
@@ -74,4 +147,9 @@ export class PaymentsService {
 
         return findOptions;
     };
+
+    // TODO change to Payment[]
+    settleUpPayments(payments: any[]): any[] {
+        return [];
+    }
 }

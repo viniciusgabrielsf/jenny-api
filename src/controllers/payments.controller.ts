@@ -14,17 +14,21 @@ export class PaymentsController {
         let filter, options;
 
         try {
-            filter = myPaymentsFilterSchema.parse({ ...req.params, userId });
-            options = getOptionsSchema.parse(req.params);
+            filter = myPaymentsFilterSchema.parse(req.query?.filter);
+            filter.userId = userId;
+            options = getOptionsSchema.parse(req.query);
         } catch (error) {
             throw new BadRequestException('Parâmetros de consulta inválidos');
         }
 
-        const payments = await this.paymentsService.getPayments({ ...options, filter });
+        const { items, total } = await this.paymentsService.getPayments({
+            ...options,
+            filter,
+        });
 
-        if (!payments) throw new NotFoundException('Pagamentos não encontrados');
+        if (!items) throw new NotFoundException('Pagamentos não encontrados');
 
         res.status(200);
-        res.json(payments);
+        res.json({ items, total });
     };
 }
