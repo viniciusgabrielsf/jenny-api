@@ -3,10 +3,13 @@ import { BadRequestException } from '../../../helpers/exceptions/bad-request.exc
 import User from '../../../models/user.model';
 import { UsersService } from '../../../services/users.service';
 import { NotFoundException } from '../../../helpers/exceptions/not-found.exception';
+import { Op } from 'sequelize';
 
 const mockFindOne = jest.fn();
 const mockCreate = jest.fn();
 const mockUpdate = jest.fn();
+const mockFindAndCountAll = jest.fn();
+
 jest.mock('../../../models/user.model', () => {
     return jest.fn().mockImplementation(() => {
         return { findOne: mockFindOne, create: mockCreate, update: mockUpdate };
@@ -22,6 +25,8 @@ describe('UsersService (Unit Test)', () => {
         User.findOne = mockFindOne;
         User.create = mockCreate;
         User.update = mockUpdate;
+        User.findAndCountAll = mockFindAndCountAll;
+        jest.clearAllMocks();
     });
 
     it('createUser should throw error if email already in use', async () => {
@@ -222,6 +227,142 @@ describe('UsersService (Unit Test)', () => {
             expect(user.checkPassword).toHaveBeenCalledWith('correctOldPass');
             expect(user.passwordHash).toBe('newPass');
             expect(mockSave).toHaveBeenCalled();
+        });
+    });
+
+    describe('getUsers', () => {
+        it('should return all users without search', async () => {
+            const users = [
+                {
+                    id: '1',
+                    fullName: 'Killua Zoldyck',
+                    email: 'killua@zoldyck.com',
+                },
+                {
+                    id: '2',
+                    fullName: 'Gon Freecss',
+                    email: 'gon@freecss.com',
+                },
+            ];
+
+            mockFindAndCountAll.mockResolvedValueOnce({ count: 2, rows: users });
+
+            const result = await usersService.getUsers();
+
+            expect(mockFindAndCountAll).toHaveBeenCalledWith({
+                where: {},
+                attributes: { exclude: ['passwordHash', 'createdAt', 'updatedAt'] },
+                order: [['createdAt', 'DESC']],
+            });
+            expect(result).toEqual({ items: users, total: 2 });
+        });
+
+        it('should filter users by search term on email', async () => {
+            const users = [
+                {
+                    id: '1',
+                    fullName: 'Killua Zoldyck',
+                    email: 'killua@zoldyck.com',
+                },
+            ];
+
+            mockFindAndCountAll.mockResolvedValueOnce({ count: 1, rows: users });
+
+            const result = await usersService.getUsers({
+                filter: { search: 'killua' },
+            });
+
+            expect(mockFindAndCountAll).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: expect.objectContaining({
+                        [Op.or]: expect.arrayContaining([
+                            { email: { [Op.iLike]: '%killua%' } },
+                            { fullName: { [Op.iLike]: '%killua%' } },
+                        ]),
+                    }),
+                    attributes: { exclude: ['passwordHash', 'createdAt', 'updatedAt'] },
+                })
+            );
+            expect(result).toEqual({ items: users, total: 1 });
+        });
+
+        it('should filter users by search term on fullName', async () => {
+            const users = [
+                {
+                    id: '2',
+                    fullName: 'Gon Freecss',
+                    email: 'gon@freecss.com',
+                },
+            ];
+
+            mockFindAndCountAll.mockResolvedValueOnce({ count: 1, rows: users });
+
+            const result = await usersService.getUsers({
+                filter: { search: 'Gon' },
+            });
+
+            expect(mockFindAndCountAll).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: expect.objectContaining({
+                        [Op.or]: expect.arrayContaining([
+                            { email: { [Op.iLike]: '%Gon%' } },
+                            { fullName: { [Op.iLike]: '%Gon%' } },
+                        ]),
+                    }),
+                })
+            );
+            expect(result).toEqual({ items: users, total: 1 });
+        });
+
+        it('should apply limit and offset for pagination', async () => {
+            const users = [
+                {
+                    id: '1',
+                    fullName: 'Killua Zoldyck',
+                    email: 'killua@zoldyck.com',
+                },
+            ];
+
+            mockFindAndCountAll.mockResolvedValueOnce({ count: 10, rows: users });
+
+            await usersService.getUsers({
+                limit: 10,
+                offset: 0,
+            });
+
+            expect(mockFindAndCountAll).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    limit: 10,
+                    offset: 0,
+                })
+            );
+        });
+
+        it('should return empty result when no users match search', async () => {
+            mockFindAndCountAll.mockResolvedValueOnce({ count: 0, rows: [] });
+
+            const result = await usersService.getUsers({
+                filter: { search: 'nonexistent' },
+            });
+
+            expect(result).toEqual({ items: [], total: 0 });
+        });
+
+        it('should apply orderField and orderDirection', async () => {
+            const users: any[] = [];
+
+            mockFindAndCountAll.mockResolvedValueOnce({ count: 0, rows: users });
+
+            await usersService.getUsers({
+                orderField: 'email',
+                orderDirection: 'ASC',
+            });
+
+            expect(mockFindAndCountAll).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    order: [['email', 'ASC']],
+                })
+            );
         });
     });
 });
