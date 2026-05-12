@@ -7,8 +7,10 @@ import {
     UpdatedAt,
     ForeignKey,
     BelongsTo,
+    HasMany,
 } from 'sequelize-typescript';
 import User from './user.model';
+import TeamMembership from './team-membership.model';
 
 export type ITeam = {
     id: string;
@@ -37,6 +39,9 @@ export default class Team extends Model {
 
     @BelongsTo(() => User, 'createdByUserId')
     createdByUser?: User;
+
+    @HasMany(() => TeamMembership)
+    memberships?: TeamMembership[];
 
     @Column({ field: 'created_at', allowNull: false, type: DataTypes.DATE })
     @CreatedAt
