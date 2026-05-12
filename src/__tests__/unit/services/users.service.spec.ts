@@ -42,7 +42,7 @@ describe('UsersService (Unit Test)', () => {
 
         expect(mockFindOne).toHaveBeenCalledWith({ where: { email: userData.email } });
         await expect(resultPromise).rejects.toThrow(
-            new BadRequestException('Email already in use')
+            new BadRequestException('Email já está em uso')
         );
     });
 
@@ -89,7 +89,9 @@ describe('UsersService (Unit Test)', () => {
         const resultPromise = usersService.getUser(userId);
 
         expect(mockFindOne).toHaveBeenCalledWith({ where: { id: userId } });
-        await expect(resultPromise).rejects.toThrow(new NotFoundException('User not found'));
+        await expect(resultPromise).rejects.toThrow(
+            new NotFoundException('Usuário não encontrado')
+        );
     });
 
     it('getUser should return user if found', async () => {
@@ -119,7 +121,9 @@ describe('UsersService (Unit Test)', () => {
             const resultPromise = usersService.updateUser(userId, updates);
 
             expect(mockFindOne).toHaveBeenCalledWith({ where: { id: userId } });
-            await expect(resultPromise).rejects.toThrow(new NotFoundException('User not found'));
+            await expect(resultPromise).rejects.toThrow(
+                new NotFoundException('Usuário não encontrado')
+            );
         });
 
         it('should throw BadRequestException if email already in use', async () => {
@@ -137,7 +141,7 @@ describe('UsersService (Unit Test)', () => {
             const resultPromise = usersService.updateUser(existingUser.id, updates);
 
             await expect(resultPromise).rejects.toThrow(
-                new BadRequestException('Email already in use')
+                new BadRequestException('Email já está em uso')
             );
         });
 
@@ -183,7 +187,9 @@ describe('UsersService (Unit Test)', () => {
             const resultPromise = usersService.updatePassword(userId, 'oldPass', 'newPass');
 
             expect(mockFindOne).toHaveBeenCalledWith({ where: { id: userId } });
-            await expect(resultPromise).rejects.toThrow(new NotFoundException('User not found'));
+            await expect(resultPromise).rejects.toThrow(
+                new NotFoundException('Usuário não encontrado')
+            );
         });
 
         it('should throw BadRequestException if old password is incorrect', async () => {
@@ -196,7 +202,7 @@ describe('UsersService (Unit Test)', () => {
             const resultPromise = usersService.updatePassword(user.id, 'wrongOldPass', 'newPass');
 
             await expect(resultPromise).rejects.toThrow(
-                new BadRequestException('Old password is incorrect')
+                new BadRequestException('Senha antiga está incorreta')
             );
             expect(user.checkPassword).toHaveBeenCalledWith('wrongOldPass');
         });
