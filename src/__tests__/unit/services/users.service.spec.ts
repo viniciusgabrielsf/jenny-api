@@ -31,7 +31,7 @@ describe('UsersService (Unit Test)', () => {
             birthDate: '2000-01-01',
             password: 'GonsBestFriend123',
         };
-        mockFindOne.mockResolvedValueOnce({ id: 1, ...userData });
+        mockFindOne.mockResolvedValueOnce({ id: '1', ...userData });
 
         const resultPromise = usersService.createUser(
             userData.name,
@@ -84,7 +84,7 @@ describe('UsersService (Unit Test)', () => {
 
     it('getUser should throw error if user not found', async () => {
         mockFindOne.mockResolvedValueOnce(null);
-        const userId = 1;
+        const userId = '1';
 
         const resultPromise = usersService.getUser(userId);
 
@@ -96,7 +96,7 @@ describe('UsersService (Unit Test)', () => {
 
     it('getUser should return user if found', async () => {
         const user = {
-            id: 1,
+            id: '1',
             fullName: 'killua@zoldyck.com',
             email: 'Killua Zoldyck',
             birthDate: moment('2000-01-01', 'YYYY-MM-DD').toDate(),
@@ -115,7 +115,7 @@ describe('UsersService (Unit Test)', () => {
     describe('updateUser', () => {
         it('should throw NotFoundException if user not found', async () => {
             mockFindOne.mockResolvedValueOnce(null);
-            const userId = 1;
+            const userId = '1';
             const updates = { fullName: 'New Name' };
 
             const resultPromise = usersService.updateUser(userId, updates);
@@ -128,7 +128,7 @@ describe('UsersService (Unit Test)', () => {
 
         it('should throw BadRequestException if email already in use', async () => {
             const existingUser = {
-                id: 1,
+                id: '1',
                 fullName: 'Killua Zoldyck',
                 email: 'killua@zoldyck.com',
             };
@@ -136,7 +136,7 @@ describe('UsersService (Unit Test)', () => {
 
             mockFindOne
                 .mockResolvedValueOnce(existingUser)
-                .mockResolvedValueOnce({ id: 2, email: 'gon@freecss.com' });
+                .mockResolvedValueOnce({ id: '2', email: 'gon@freecss.com' });
 
             const resultPromise = usersService.updateUser(existingUser.id, updates);
 
@@ -147,7 +147,7 @@ describe('UsersService (Unit Test)', () => {
 
         it('should update user successfully when email is not changed', async () => {
             const existingUser = {
-                id: 1,
+                id: '1',
                 fullName: 'Killua Zoldyck',
                 email: 'killua@zoldyck.com',
             };
@@ -163,7 +163,7 @@ describe('UsersService (Unit Test)', () => {
 
         it('should update user successfully when email is changed and not in use', async () => {
             const existingUser = {
-                id: 1,
+                id: '1',
                 fullName: 'Killua Zoldyck',
                 email: 'killua@zoldyck.com',
             };
@@ -182,7 +182,7 @@ describe('UsersService (Unit Test)', () => {
     describe('updatePassword', () => {
         it('should throw NotFoundException if user not found', async () => {
             mockFindOne.mockResolvedValueOnce(null);
-            const userId = 1;
+            const userId = '1';
 
             const resultPromise = usersService.updatePassword(userId, 'oldPass', 'newPass');
 
@@ -194,7 +194,7 @@ describe('UsersService (Unit Test)', () => {
 
         it('should throw BadRequestException if old password is incorrect', async () => {
             const user = {
-                id: 1,
+                id: '1',
                 checkPassword: jest.fn().mockResolvedValue(false),
             };
             mockFindOne.mockResolvedValueOnce(user);
@@ -210,7 +210,7 @@ describe('UsersService (Unit Test)', () => {
         it('should update password successfully', async () => {
             const mockSave = jest.fn().mockResolvedValue(undefined);
             const user = {
-                id: 1,
+                id: '1',
                 passwordHash: 'oldHashedPassword',
                 checkPassword: jest.fn().mockResolvedValue(true),
                 save: mockSave,

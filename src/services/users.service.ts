@@ -33,7 +33,7 @@ export class UsersService {
         return newUser;
     }
 
-    async getUser(id: number, options?: FindOptions<Attributes<User>>): Promise<IUser | null> {
+    async getUser(id: string, options?: FindOptions<Attributes<User>>): Promise<IUser | null> {
         const existingUser = await User.findOne({ ...options, where: { id } });
 
         if (!existingUser) {
@@ -44,7 +44,7 @@ export class UsersService {
     }
 
     async updateUser(
-        id: number,
+        id: string,
         updates: Partial<Omit<User, 'id' | 'createdAt' | 'updatedAt' | 'passwordHash'>>
     ): Promise<void> {
         const user = await User.findOne({ where: { id } });
@@ -63,7 +63,7 @@ export class UsersService {
     }
 
     updatePassword = async (
-        userId: number,
+        userId: string,
         oldPassword: string,
         newPassword: string
     ): Promise<void> => {
