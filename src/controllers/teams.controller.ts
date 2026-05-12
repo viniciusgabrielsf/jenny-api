@@ -3,6 +3,7 @@ import { TeamsService } from '../services/teams.service';
 import { NotFoundException } from '../helpers/exceptions/not-found.exception';
 import { BadRequestException } from '../helpers/exceptions/bad-request.exception';
 import { getTeamsQuerySchema } from '../helpers/schemas/teams/get-teams.schema';
+import { createTeamBodySchema } from '../helpers/schemas/teams/create-team.schema';
 
 export class TeamsController {
     constructor(private teamsService: TeamsService) {}
@@ -22,5 +23,23 @@ export class TeamsController {
         const result = await this.teamsService.getTeamsForUser(userId, search);
 
         res.status(200).json(result);
+    };
+
+    createTeam = async (req: Request, res: Response): Promise<void> => {
+        const userId = req.user?.id;
+        if (!userId) throw new NotFoundException('Usuario nao encontrado');
+
+        let name: string;
+        let members: string[];
+
+        try {
+            ({ name, members } = createTeamBodySchema.parse(req.body));
+        } catch (error) {
+            throw new BadRequestException('Dados de criacao do time invalidos');
+        }
+
+        const team = await this.teamsService.createTeam(name, userId, members);
+
+        res.status(201).json(team);
     };
 }

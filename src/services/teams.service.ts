@@ -1,4 +1,5 @@
 import { Op } from 'sequelize';
+import { sequelize } from '../config/db';
 import Team from '../models/team.model';
 import TeamMembership from '../models/team-membership.model';
 import User from '../models/user.model';
@@ -80,5 +81,73 @@ export class TeamsService {
         }));
 
         return { items, total: items.length };
+    }
+
+    async createTeam(
+        name: string,
+        createdByUserId: string,
+        memberIds: string[]
+    ): Promise<TeamResponse> {
+        const transaction = await sequelize.transaction();
+
+        try {
+            const team = await Team.create(
+                {
+                    name,
+                    createdByUserId,
+                },
+                { transaction }
+            );
+
+            const uniqueMemberIds = Array.from(new Set([createdByUserId, ...memberIds]));
+
+            await TeamMembership.bulkCreate(
+                uniqueMemberIds.map(userId => ({
+                    teamId: team.id,
+                    userId,
+                })),
+                { transaction }
+            );
+
+            const createdTeam = await Team.findByPk(team.id, {
+                attributes: ['id', 'name', 'createdByUserId', 'createdAt', 'updatedAt'],
+                include: [
+                    {
+                        model: TeamMembership,
+                        as: 'memberships',
+                        attributes: ['teamId', 'userId'],
+                        include: [
+                            {
+                                model: User,
+                                as: 'user',
+                                attributes: ['id', 'fullName', 'avatar'],
+                            },
+                        ],
+                    },
+                ],
+                transaction,
+            });
+
+            await transaction.commit();
+
+            return {
+                id: createdTeam!.id,
+                name: createdTeam!.name,
+                createdByUserId: createdTeam!.createdByUserId,
+                createdAt: createdTeam!.createdAt,
+                updatedAt: createdTeam!.updatedAt,
+                members: (createdTeam!.memberships || [])
+                    .map(membership => membership.user)
+                    .filter((member): member is User => Boolean(member))
+                    .map(member => ({
+                        id: member.id,
+                        fullName: member.fullName,
+                        avatar: member.avatar,
+                    })),
+            };
+        } catch (error) {
+            await transaction.rollback();
+            throw error;
+        }
     }
 }

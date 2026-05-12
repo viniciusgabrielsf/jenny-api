@@ -6,6 +6,7 @@ import { authentication } from '../config/middleware/auth.middleware';
 const router = Router();
 const teamsController = new TeamsController(new TeamsService());
 
-router.get('/', authentication, teamsController.getTeams);
+router.get('/me', authentication, teamsController.getTeams);
+router.post('/', authentication, teamsController.createTeam);
 
 export default router;
