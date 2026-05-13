@@ -8,5 +8,6 @@ const teamsController = new TeamsController(new TeamsService());
 
 router.get('/me', authentication, teamsController.getTeams);
 router.post('/', authentication, teamsController.createTeam);
+router.patch('/:id', authentication, teamsController.updateTeam);
 
 export default router;

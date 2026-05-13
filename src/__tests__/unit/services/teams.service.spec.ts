@@ -280,4 +280,223 @@ describe('TeamsService (Unit Test)', () => {
             expect(mockTransaction.commit).not.toHaveBeenCalled();
         });
     });
+
+    describe('updateTeam', () => {
+        it('should throw BadRequestException if creator is not in members array', async () => {
+            await expect(
+                teamsService.updateTeam('team-1', 'user-1', 'Updated Team', ['user-2', 'user-3'])
+            ).rejects.toThrow(
+                new (require('../../../helpers/exceptions/bad-request.exception').BadRequestException)(
+                    'o criador deve ser um membro do grupo'
+                )
+            );
+        });
+
+        it('should throw NotFoundException if team does not exist', async () => {
+            const mockTransaction = {
+                commit: jest.fn(),
+                rollback: jest.fn(),
+            };
+
+            (sequelize.transaction as jest.Mock).mockResolvedValue(mockTransaction);
+            (Team.findByPk as jest.Mock).mockResolvedValue(null);
+
+            await expect(
+                teamsService.updateTeam('team-1', 'user-1', 'Updated Team', ['user-1'])
+            ).rejects.toThrow(
+                new (require('../../../helpers/exceptions/not-found.exception').NotFoundException)(
+                    'Time não encontrado'
+                )
+            );
+
+            expect(mockTransaction.rollback).toHaveBeenCalled();
+        });
+
+        it('should update team with new name and members', async () => {
+            const mockTransaction = {
+                commit: jest.fn(),
+                rollback: jest.fn(),
+            };
+
+            const mockTeamInstance = {
+                update: jest.fn().mockResolvedValue(undefined),
+            };
+
+            (sequelize.transaction as jest.Mock).mockResolvedValue(mockTransaction);
+            (Team.findByPk as jest.Mock)
+                .mockResolvedValueOnce(mockTeamInstance)
+                .mockResolvedValueOnce({
+                    id: 'team-1',
+                    name: 'Updated Team',
+                    createdByUserId: 'user-1',
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                    memberships: [
+                        {
+                            teamId: 'team-1',
+                            userId: 'user-1',
+                            user: { id: 'user-1', fullName: 'User 1', avatar: 'url-1' },
+                        },
+                        {
+                            teamId: 'team-1',
+                            userId: 'user-2',
+                            user: { id: 'user-2', fullName: 'User 2', avatar: 'url-2' },
+                        },
+                    ],
+                });
+
+            (TeamMembership.destroy as jest.Mock).mockResolvedValue(2);
+            (TeamMembership.bulkCreate as jest.Mock).mockResolvedValue([]);
+
+            const result = await teamsService.updateTeam('team-1', 'user-1', 'Updated Team', [
+                'user-1',
+                'user-2',
+            ]);
+
+            expect(mockTeamInstance.update).toHaveBeenCalledWith(
+                { name: 'Updated Team' },
+                { transaction: mockTransaction }
+            );
+            expect(TeamMembership.destroy).toHaveBeenCalledWith({
+                where: { teamId: 'team-1' },
+                transaction: mockTransaction,
+            });
+            expect(TeamMembership.bulkCreate).toHaveBeenCalledWith(
+                expect.arrayContaining([
+                    { teamId: 'team-1', userId: 'user-1' },
+                    { teamId: 'team-1', userId: 'user-2' },
+                ]),
+                { transaction: mockTransaction }
+            );
+            expect(mockTransaction.commit).toHaveBeenCalled();
+            expect(result.name).toBe('Updated Team');
+            expect(result.members).toHaveLength(2);
+        });
+
+        it('should deduplicate members during update', async () => {
+            const mockTransaction = {
+                commit: jest.fn(),
+                rollback: jest.fn(),
+            };
+
+            const mockTeamInstance = {
+                update: jest.fn().mockResolvedValue(undefined),
+            };
+
+            (sequelize.transaction as jest.Mock).mockResolvedValue(mockTransaction);
+            (Team.findByPk as jest.Mock)
+                .mockResolvedValueOnce(mockTeamInstance)
+                .mockResolvedValueOnce({
+                    id: 'team-1',
+                    name: 'Updated Team',
+                    createdByUserId: 'user-1',
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                    memberships: [
+                        {
+                            teamId: 'team-1',
+                            userId: 'user-1',
+                            user: { id: 'user-1', fullName: 'User 1', avatar: 'url-1' },
+                        },
+                    ],
+                });
+
+            (TeamMembership.destroy as jest.Mock).mockResolvedValue(1);
+            (TeamMembership.bulkCreate as jest.Mock).mockResolvedValue([]);
+
+            await teamsService.updateTeam('team-1', 'user-1', 'Updated Team', [
+                'user-1',
+                'user-1',
+                'user-1',
+            ]);
+
+            const bulkCreateCall = (TeamMembership.bulkCreate as jest.Mock).mock.calls[0][0];
+            expect(bulkCreateCall).toHaveLength(1);
+            expect(bulkCreateCall[0].userId).toBe('user-1');
+        });
+
+        it('should rollback transaction on error during update', async () => {
+            const mockTransaction = {
+                commit: jest.fn(),
+                rollback: jest.fn(),
+            };
+
+            const mockTeamInstance = {
+                update: jest.fn().mockRejectedValue(new Error('DB Error')),
+            };
+
+            (sequelize.transaction as jest.Mock).mockResolvedValue(mockTransaction);
+            (Team.findByPk as jest.Mock).mockResolvedValueOnce(mockTeamInstance);
+
+            await expect(
+                teamsService.updateTeam('team-1', 'user-1', 'Updated Team', ['user-1'])
+            ).rejects.toThrow('DB Error');
+
+            expect(mockTransaction.rollback).toHaveBeenCalled();
+            expect(mockTransaction.commit).not.toHaveBeenCalled();
+        });
+
+        it('should return updated team with transformed members data', async () => {
+            const mockTransaction = {
+                commit: jest.fn(),
+                rollback: jest.fn(),
+            };
+
+            const mockTeamInstance = {
+                update: jest.fn().mockResolvedValue(undefined),
+            };
+
+            const updatedDate = new Date();
+            const createdDate = new Date();
+
+            (sequelize.transaction as jest.Mock).mockResolvedValue(mockTransaction);
+            (Team.findByPk as jest.Mock)
+                .mockResolvedValueOnce(mockTeamInstance)
+                .mockResolvedValueOnce({
+                    id: 'team-1',
+                    name: 'Updated Team',
+                    createdByUserId: 'user-1',
+                    createdAt: createdDate,
+                    updatedAt: updatedDate,
+                    memberships: [
+                        {
+                            teamId: 'team-1',
+                            userId: 'user-1',
+                            user: { id: 'user-1', fullName: 'User 1', avatar: 'url-1' },
+                        },
+                        {
+                            teamId: 'team-1',
+                            userId: 'user-2',
+                            user: null, // Handle case where user might be null
+                        },
+                        {
+                            teamId: 'team-1',
+                            userId: 'user-3',
+                            user: { id: 'user-3', fullName: 'User 3', avatar: undefined },
+                        },
+                    ],
+                });
+
+            (TeamMembership.destroy as jest.Mock).mockResolvedValue(3);
+            (TeamMembership.bulkCreate as jest.Mock).mockResolvedValue([]);
+
+            const result = await teamsService.updateTeam('team-1', 'user-1', 'Updated Team', [
+                'user-1',
+                'user-2',
+                'user-3',
+            ]);
+
+            expect(result).toEqual({
+                id: 'team-1',
+                name: 'Updated Team',
+                createdByUserId: 'user-1',
+                createdAt: createdDate,
+                updatedAt: updatedDate,
+                members: [
+                    { id: 'user-1', fullName: 'User 1', avatar: 'url-1' },
+                    { id: 'user-3', fullName: 'User 3', avatar: undefined },
+                ],
+            });
+        });
+    });
 });

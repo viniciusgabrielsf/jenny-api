@@ -3,6 +3,8 @@ import { sequelize } from '../config/db';
 import Team from '../models/team.model';
 import TeamMembership from '../models/team-membership.model';
 import User from '../models/user.model';
+import { BadRequestException } from '../helpers/exceptions/bad-request.exception';
+import { NotFoundException } from '../helpers/exceptions/not-found.exception';
 
 export type TeamMemberResponse = {
     id: string;
@@ -137,6 +139,83 @@ export class TeamsService {
                 createdAt: createdTeam!.createdAt,
                 updatedAt: createdTeam!.updatedAt,
                 members: (createdTeam!.memberships || [])
+                    .map(membership => membership.user)
+                    .filter((member): member is User => Boolean(member))
+                    .map(member => ({
+                        id: member.id,
+                        fullName: member.fullName,
+                        avatar: member.avatar,
+                    })),
+            };
+        } catch (error) {
+            await transaction.rollback();
+            throw error;
+        }
+    }
+
+    async updateTeam(
+        teamId: string,
+        createdByUserId: string,
+        name: string,
+        memberIds: string[]
+    ): Promise<TeamResponse> {
+        if (!memberIds.includes(createdByUserId)) {
+            throw new BadRequestException('o criador deve ser um membro do grupo');
+        }
+
+        const transaction = await sequelize.transaction();
+
+        try {
+            const team = await Team.findByPk(teamId);
+
+            if (!team) {
+                throw new NotFoundException('Time não encontrado');
+            }
+
+            await team.update({ name }, { transaction });
+
+            await TeamMembership.destroy({
+                where: { teamId },
+                transaction,
+            });
+            const uniqueMemberIds = Array.from(new Set(memberIds));
+
+            await TeamMembership.bulkCreate(
+                uniqueMemberIds.map(userId => ({
+                    teamId,
+                    userId,
+                })),
+                { transaction }
+            );
+
+            const updatedTeam = await Team.findByPk(teamId, {
+                attributes: ['id', 'name', 'createdByUserId', 'createdAt', 'updatedAt'],
+                include: [
+                    {
+                        model: TeamMembership,
+                        as: 'memberships',
+                        attributes: ['teamId', 'userId'],
+                        include: [
+                            {
+                                model: User,
+                                as: 'user',
+                                attributes: ['id', 'fullName', 'avatar'],
+                            },
+                        ],
+                    },
+                ],
+                transaction,
+            });
+
+            await transaction.commit();
+
+            return {
+                id: updatedTeam!.id,
+                name: updatedTeam!.name,
+                createdByUserId: updatedTeam!.createdByUserId,
+                createdAt: updatedTeam!.createdAt,
+                updatedAt: updatedTeam!.updatedAt,
+                members: (updatedTeam!.memberships || [])
                     .map(membership => membership.user)
                     .filter((member): member is User => Boolean(member))
                     .map(member => ({
