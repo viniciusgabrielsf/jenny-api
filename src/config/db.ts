@@ -12,7 +12,10 @@ export const sequelize = new Sequelize(env.POSTGRES_DB, env.POSTGRES_USER, env.P
     },
     models: [__dirname + '/../models/**/*.model.ts'],
     modelMatch: (filename, member) => {
-        return filename.substring(0, filename.indexOf('.model')) === member.toLowerCase();
+        const normalizedFile = filename
+            .substring(0, filename.indexOf('.model'))
+            .replace(/-/g, '');
+        return normalizedFile === member.toLowerCase();
     },
     timezone: '-03:00',
 });

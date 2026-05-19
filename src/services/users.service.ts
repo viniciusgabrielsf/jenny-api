@@ -1,14 +1,39 @@
-import { Attributes, FindOptions } from 'sequelize/types/model';
+import { Attributes, FindOptions, Op } from 'sequelize';
 import User, { IUser } from '../models/user.model';
 import { BadRequestException } from '../helpers/exceptions/bad-request.exception';
 import moment from 'moment';
 import { NotFoundException } from '../helpers/exceptions/not-found.exception';
+import { IGetOptions } from '../config/interfaces';
+import { buildBaseFindOptions } from '../helpers/get-options.helper';
+import { GetUsersFilterSchemaType } from '../helpers/schemas/users/get-users.schema';
+
+export type UsersListResponse = {
+    items: IUser[];
+    total: number;
+};
 
 export class UsersService {
     constructor() {}
 
-    async getUsers(options?: FindOptions<Attributes<User>>): Promise<IUser[]> {
-        return User.findAll(options);
+    async getUsers(options?: IGetOptions<GetUsersFilterSchemaType>): Promise<UsersListResponse> {
+        const where: any = {};
+
+        if (options?.filter?.search) {
+            where[Op.or] = [
+                { email: { [Op.iLike]: `%${options.filter.search}%` } },
+                { fullName: { [Op.iLike]: `%${options.filter.search}%` } },
+            ];
+        }
+
+        const findOptions = buildBaseFindOptions(options);
+        const { count, rows } = await User.findAndCountAll({
+            ...findOptions,
+            where,
+            attributes: { exclude: ['passwordHash', 'createdAt', 'updatedAt'] },
+            order: findOptions.order || [['createdAt', 'DESC']],
+        });
+
+        return { items: rows, total: count };
     }
 
     async createUser(
@@ -33,7 +58,7 @@ export class UsersService {
         return newUser;
     }
 
-    async getUser(id: number, options?: FindOptions<Attributes<User>>): Promise<IUser | null> {
+    async getUser(id: string, options?: FindOptions<Attributes<User>>): Promise<IUser | null> {
         const existingUser = await User.findOne({ ...options, where: { id } });
 
         if (!existingUser) {
@@ -44,7 +69,7 @@ export class UsersService {
     }
 
     async updateUser(
-        id: number,
+        id: string,
         updates: Partial<Omit<User, 'id' | 'createdAt' | 'updatedAt' | 'passwordHash'>>
     ): Promise<void> {
         const user = await User.findOne({ where: { id } });
@@ -63,7 +88,7 @@ export class UsersService {
     }
 
     updatePassword = async (
-        userId: number,
+        userId: string,
         oldPassword: string,
         newPassword: string
     ): Promise<void> => {

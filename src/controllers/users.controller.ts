@@ -1,16 +1,29 @@
 import { UsersService } from '../services/users.service';
 import { Request, Response } from 'express';
 import { NotFoundException } from '../helpers/exceptions/not-found.exception';
+import { BadRequestException } from '../helpers/exceptions/bad-request.exception';
+import { getUsersFilterSchema } from '../helpers/schemas/users/get-users.schema';
+import { getOptionsSchema } from '../helpers/schemas/get-options.schema';
+
 export class UsersController {
     constructor(private usersService: UsersService) {}
 
     getUsers = async (req: Request, res: Response): Promise<void> => {
-        const users = await this.usersService.getUsers({
-            attributes: { exclude: ['passwordHash', 'createdAt', 'updatedAt'] },
+        let filter, options;
+
+        try {
+            filter = getUsersFilterSchema.parse(req.query?.filter || {});
+            options = getOptionsSchema.parse(req.query);
+        } catch (error) {
+            throw new BadRequestException('Parâmetros de consulta inválidos');
+        }
+
+        const result = await this.usersService.getUsers({
+            ...options,
+            filter,
         });
 
-        res.status(200);
-        res.json(users);
+        res.status(200).json(result);
     };
 
     createUser = async (req: Request, res: Response): Promise<void> => {

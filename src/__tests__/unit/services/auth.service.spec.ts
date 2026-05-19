@@ -5,6 +5,7 @@ import User from '../../../models/user.model';
 import { env } from '../../../config/env';
 import jwt from 'jsonwebtoken';
 import { UnauthorizedException } from '../../../helpers/exceptions/unauthorized.exception';
+import { BadRequestException } from '../../../helpers/exceptions/bad-request.exception';
 import { timeStringToMilliseconds } from '../../../helpers/time-to-miliseconds.helper';
 
 jest.mock('../../../models/user.model');
@@ -31,17 +32,17 @@ describe('AuthService (Unit Test)', () => {
     });
 
     describe('logIn', () => {
-        it('should throw UnauthorizedException if user not found', async () => {
+        it('should throw BadRequestException if user not found', async () => {
             (User.findOne as jest.Mock).mockResolvedValue(null);
 
-            await expect(authService.logIn('email', 'pass')).rejects.toThrow(UnauthorizedException);
+            await expect(authService.logIn('email', 'pass')).rejects.toThrow(BadRequestException);
         });
 
-        it('should throw UnauthorizedException if password is invalid', async () => {
+        it('should throw BadRequestException if password is invalid', async () => {
             (User.findOne as jest.Mock).mockResolvedValue(user);
             user.checkPassword.mockResolvedValue(false);
 
-            await expect(authService.logIn('email', 'pass')).rejects.toThrow(UnauthorizedException);
+            await expect(authService.logIn('email', 'pass')).rejects.toThrow(BadRequestException);
         });
 
         it('should return tokens and user on success', async () => {

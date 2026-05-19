@@ -7,9 +7,9 @@ export function buildBaseFindOptions<FilterType>(options?: IGetOptions<FilterTyp
     if (options?.orderField)
         findOptions.order = [[options.orderField, options.orderDirection || 'ASC']];
 
-    if (options?.limit) findOptions.limit = options.limit;
+    if (options?.limit !== undefined) findOptions.limit = options.limit;
 
-    if (options?.offset) findOptions.offset = options.offset;
+    if (options?.offset !== undefined) findOptions.offset = options.offset;
 
     return findOptions;
 }

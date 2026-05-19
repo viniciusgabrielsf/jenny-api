@@ -6,6 +6,7 @@ import { authentication } from '../config/middleware/auth.middleware';
 const router = Router();
 const usersController = new UsersController(new UsersService());
 
+router.get('/', authentication, usersController.getUsers);
 router.post('/', usersController.createUser);
 router.get('/me', authentication, usersController.getCurrentUser);
 router.patch('/me', authentication, usersController.updateUser);

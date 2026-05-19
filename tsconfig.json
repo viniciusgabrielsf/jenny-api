@@ -54,6 +54,7 @@
         "outDir": "dist",
         "esModuleInterop": true,
         "moduleResolution": "node",
+        "types": ["node", "jest"],
         "strict": true,
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true,
