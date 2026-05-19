@@ -499,4 +499,113 @@ describe('TeamsService (Unit Test)', () => {
             });
         });
     });
+
+    describe('deleteTeam', () => {
+        it('should throw BadRequestException if user is not a member', async () => {
+            (TeamMembership.findOne as jest.Mock).mockResolvedValue(null);
+
+            await expect(teamsService.deleteTeam('team-1', 'user-1')).rejects.toThrow(
+                new (require('../../../helpers/exceptions/bad-request.exception').BadRequestException)(
+                    'Você não é membro deste time'
+                )
+            );
+
+            expect(TeamMembership.findOne).toHaveBeenCalledWith({
+                where: { teamId: 'team-1', userId: 'user-1' },
+            });
+        });
+
+        it('should delete team and memberships successfully', async () => {
+            const mockTransaction = {
+                commit: jest.fn(),
+                rollback: jest.fn(),
+            };
+
+            (TeamMembership.findOne as jest.Mock).mockResolvedValue({
+                teamId: 'team-1',
+                userId: 'user-1',
+            });
+            (sequelize.transaction as jest.Mock).mockResolvedValue(mockTransaction);
+            (TeamMembership.destroy as jest.Mock).mockResolvedValue(2);
+            (Team.destroy as jest.Mock).mockResolvedValue(1);
+
+            await teamsService.deleteTeam('team-1', 'user-1');
+
+            expect(TeamMembership.destroy).toHaveBeenCalledWith({
+                where: { teamId: 'team-1' },
+                transaction: mockTransaction,
+            });
+            expect(Team.destroy).toHaveBeenCalledWith({
+                where: { id: 'team-1' },
+                transaction: mockTransaction,
+            });
+            expect(mockTransaction.commit).toHaveBeenCalled();
+            expect(mockTransaction.rollback).not.toHaveBeenCalled();
+        });
+
+        it('should allow any team member to delete the team', async () => {
+            const mockTransaction = {
+                commit: jest.fn(),
+                rollback: jest.fn(),
+            };
+
+            (TeamMembership.findOne as jest.Mock).mockResolvedValue({
+                teamId: 'team-1',
+                userId: 'user-2', // Different user than creator
+            });
+            (sequelize.transaction as jest.Mock).mockResolvedValue(mockTransaction);
+            (TeamMembership.destroy as jest.Mock).mockResolvedValue(3);
+            (Team.destroy as jest.Mock).mockResolvedValue(1);
+
+            await teamsService.deleteTeam('team-1', 'user-2');
+
+            expect(mockTransaction.commit).toHaveBeenCalled();
+        });
+
+        it('should rollback transaction on error during delete', async () => {
+            const mockTransaction = {
+                commit: jest.fn(),
+                rollback: jest.fn(),
+            };
+
+            (TeamMembership.findOne as jest.Mock).mockResolvedValue({
+                teamId: 'team-1',
+                userId: 'user-1',
+            });
+            (sequelize.transaction as jest.Mock).mockResolvedValue(mockTransaction);
+            (TeamMembership.destroy as jest.Mock).mockRejectedValue(new Error('DB Error'));
+
+            await expect(teamsService.deleteTeam('team-1', 'user-1')).rejects.toThrow('DB Error');
+
+            expect(mockTransaction.rollback).toHaveBeenCalled();
+            expect(mockTransaction.commit).not.toHaveBeenCalled();
+        });
+
+        it('should delete memberships before team', async () => {
+            const mockTransaction = {
+                commit: jest.fn(),
+                rollback: jest.fn(),
+            };
+
+            const callOrder: string[] = [];
+
+            (TeamMembership.findOne as jest.Mock).mockResolvedValue({
+                teamId: 'team-1',
+                userId: 'user-1',
+            });
+            (sequelize.transaction as jest.Mock).mockResolvedValue(mockTransaction);
+            (TeamMembership.destroy as jest.Mock).mockImplementation(() => {
+                callOrder.push('destroy-memberships');
+                return Promise.resolve(2);
+            });
+            (Team.destroy as jest.Mock).mockImplementation(() => {
+                callOrder.push('destroy-team');
+                return Promise.resolve(1);
+            });
+
+            await teamsService.deleteTeam('team-1', 'user-1');
+
+            expect(callOrder).toEqual(['destroy-memberships', 'destroy-team']);
+        });
+    });
 });

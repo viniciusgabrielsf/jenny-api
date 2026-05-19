@@ -9,5 +9,6 @@ const teamsController = new TeamsController(new TeamsService());
 router.get('/me', authentication, teamsController.getTeams);
 router.post('/', authentication, teamsController.createTeam);
 router.patch('/:id', authentication, teamsController.updateTeam);
+router.delete('/:id', authentication, teamsController.deleteTeam);
 
 export default router;

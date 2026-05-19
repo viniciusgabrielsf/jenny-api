@@ -63,4 +63,15 @@ export class TeamsController {
 
         res.status(200).json(team);
     };
+
+    deleteTeam = async (req: Request, res: Response): Promise<void> => {
+        const userId = req.user?.id;
+        if (!userId) throw new NotFoundException('Usuario nao encontrado');
+
+        const { id } = req.params;
+
+        await this.teamsService.deleteTeam(id, userId);
+
+        res.status(204).send();
+    };
 }

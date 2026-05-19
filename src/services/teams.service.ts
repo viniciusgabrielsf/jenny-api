@@ -229,4 +229,38 @@ export class TeamsService {
             throw error;
         }
     }
+
+    async deleteTeam(teamId: string, userId: string): Promise<void> {
+        // TODO: Validate team transactions upon delete in the future
+        
+        // Check if user is a member of the team
+        const isMember = await TeamMembership.findOne({
+            where: { teamId, userId },
+        });
+
+        if (!isMember) {
+            throw new BadRequestException('Você não é membro deste time');
+        }
+
+        const transaction = await sequelize.transaction();
+
+        try {
+            // Delete all team memberships
+            await TeamMembership.destroy({
+                where: { teamId },
+                transaction,
+            });
+
+            // Delete the team
+            await Team.destroy({
+                where: { id: teamId },
+                transaction,
+            });
+
+            await transaction.commit();
+        } catch (error) {
+            await transaction.rollback();
+            throw error;
+        }
+    }
 }
