@@ -7,12 +7,17 @@ import { buildBaseFindOptions } from '../helpers/get-options.helper';
 import { Op } from 'sequelize';
 import { TeamPaymentsFilterSchemaType } from '../helpers/schemas/payments/team-payments-filter.schema';
 
+export type ITeamPaymentRequest = Omit<
+    ITeamPayment,
+    'id' | 'createdAt' | 'updatedAt' | 'paymentDate'
+> & {
+    paymentDate: string;
+};
+
 export class TeamPaymentsService {
     constructor() {}
 
-    async createTeamPayment(
-        teamPaymentData: Omit<ITeamPayment, 'id' | 'createdAt' | 'updatedAt'>
-    ): Promise<ITeamPayment> {
+    async createTeamPayment(teamPaymentData: ITeamPaymentRequest): Promise<ITeamPayment> {
         const newTeamPayment = await TeamPayment.create({
             teamId: teamPaymentData.teamId,
             payerId: teamPaymentData.payerId,
