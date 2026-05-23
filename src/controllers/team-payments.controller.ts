@@ -5,6 +5,7 @@ import { teamPaymentsFilterSchema } from '../helpers/schemas/team-payments/team-
 import { getOptionsSchema } from '../helpers/schemas/get-options.schema';
 import { BadRequestException } from '../helpers/exceptions/bad-request.exception';
 import { createTeamPaymentSchema } from '../helpers/schemas/team-payments/create-team-payment.schema';
+import { updateTeamPaymentSchema } from '../helpers/schemas/team-payments/update-team-payment.schema';
 
 export class TeamPaymentsController {
     constructor(private teamPaymentsService: TeamPaymentsService) {}
@@ -30,6 +31,26 @@ export class TeamPaymentsController {
 
         res.status(201);
         res.json(newPayment);
+    };
+
+    updateTeamPayment = async (req: Request, res: Response): Promise<void> => {
+        const teamId = req.fullParams.teamId;
+        const paymentId = req.fullParams.paymentId;
+
+        if (!teamId) throw new NotFoundException('Time não encontrado');
+        if (!paymentId) throw new NotFoundException('Pagamento não encontrado');
+
+        let updateData;
+        try {
+            updateData = updateTeamPaymentSchema.parse(req.body);
+        } catch (error) {
+            throw new BadRequestException('Dados de atualização inválidos');
+        }
+
+        await this.teamPaymentsService.updateTeamPayment(teamId, paymentId, updateData);
+
+        res.status(200);
+        res.json({ message: 'Pagamento atualizado com sucesso' });
     };
 
     getTeamPayments = async (req: Request, res: Response): Promise<void> => {

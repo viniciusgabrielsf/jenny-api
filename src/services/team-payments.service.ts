@@ -26,7 +26,6 @@ export class TeamPaymentsService {
         title: string,
         amount: number
     ): Promise<ITeamPayment> {
-        // Validate if payer is a member of the team
         const payerMembership = await TeamMembership.findOne({
             where: { teamId, userId: payerId },
         });
@@ -35,7 +34,6 @@ export class TeamPaymentsService {
             throw new BadRequestException('O pagador deve ser membro do time');
         }
 
-        // Validate if all debtors are members of the team
         const debtorMemberships = await TeamMembership.findAll({
             where: { teamId, userId: { [Op.in]: debtorsIds } },
         });
@@ -44,7 +42,6 @@ export class TeamPaymentsService {
             throw new BadRequestException('Todos os devedores devem ser membros do time');
         }
 
-        // Create the team payment
         const newTeamPayment = await TeamPayment.create({
             teamId,
             payerId,
@@ -58,16 +55,44 @@ export class TeamPaymentsService {
     }
 
     async updateTeamPayment(
-        id: string,
-        updates: Partial<Omit<TeamPayment, 'id' | 'createdAt' | 'updatedAt'>>
+        teamId: string,
+        paymentId: string,
+        updates: {
+            payerId?: string;
+            debtorsIds?: string[];
+            title?: string;
+            amount?: number;
+        }
     ): Promise<void> {
-        const teamPayment = await TeamPayment.findOne({ where: { id } });
+        const payment = await TeamPayment.findOne({ where: { id: paymentId, teamId } });
 
-        if (!teamPayment) {
+        if (!payment) {
             throw new NotFoundException('Pagamento do time não encontrado');
         }
 
-        await TeamPayment.update(updates, { where: { id } });
+        // If payerId is being updated, validate new payer is a team member
+        if (updates.payerId && updates.payerId !== payment.payerId) {
+            const payerMembership = await TeamMembership.findOne({
+                where: { teamId, userId: updates.payerId },
+            });
+
+            if (!payerMembership) {
+                throw new BadRequestException('O novo pagador deve ser membro do time');
+            }
+        }
+
+        // If debtorsIds is being updated, validate all new debtors are team members
+        if (updates.debtorsIds && updates.debtorsIds.length > 0) {
+            const debtorMemberships = await TeamMembership.findAll({
+                where: { teamId, userId: { [Op.in]: updates.debtorsIds } },
+            });
+
+            if (debtorMemberships.length !== updates.debtorsIds.length) {
+                throw new BadRequestException('Todos os devedores devem ser membros do time');
+            }
+        }
+
+        await TeamPayment.update(updates, { where: { id: paymentId } });
     }
 
     async getTeamPayment(
