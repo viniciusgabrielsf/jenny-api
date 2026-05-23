@@ -8,5 +8,6 @@ const router = Router();
 const teamPaymentsController = new TeamPaymentsController(new TeamPaymentsService());
 
 router.get('/', authentication, teamPaymentsController.getTeamPayments);
+router.post('/', authentication, teamPaymentsController.createTeamPayment);
 
 export default router;

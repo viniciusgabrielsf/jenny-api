@@ -1,11 +1,13 @@
 import { Attributes, FindOptions } from 'sequelize/types/model';
 import TeamPayment, { ITeamPayment } from '../models/team-payment.model';
+import TeamMembership from '../models/team-membership.model';
 import moment from 'moment';
 import { NotFoundException } from '../helpers/exceptions/not-found.exception';
+import { BadRequestException } from '../helpers/exceptions/bad-request.exception';
 import { IGetOptions } from '../config/interfaces';
 import { buildBaseFindOptions } from '../helpers/get-options.helper';
 import { Op } from 'sequelize';
-import { TeamPaymentsFilterSchemaType } from '../helpers/schemas/payments/team-payments-filter.schema';
+import { TeamPaymentsFilterSchemaType } from '../helpers/schemas/team-payments/team-payments-filter.schema';
 
 export type ITeamPaymentRequest = Omit<
     ITeamPayment,
@@ -17,14 +19,39 @@ export type ITeamPaymentRequest = Omit<
 export class TeamPaymentsService {
     constructor() {}
 
-    async createTeamPayment(teamPaymentData: ITeamPaymentRequest): Promise<ITeamPayment> {
+    async createTeamPayment(
+        teamId: string,
+        payerId: string,
+        debtorsIds: string[],
+        title: string,
+        amount: number
+    ): Promise<ITeamPayment> {
+        // Validate if payer is a member of the team
+        const payerMembership = await TeamMembership.findOne({
+            where: { teamId, userId: payerId },
+        });
+
+        if (!payerMembership) {
+            throw new BadRequestException('O pagador deve ser membro do time');
+        }
+
+        // Validate if all debtors are members of the team
+        const debtorMemberships = await TeamMembership.findAll({
+            where: { teamId, userId: { [Op.in]: debtorsIds } },
+        });
+
+        if (debtorMemberships.length !== debtorsIds.length) {
+            throw new BadRequestException('Todos os devedores devem ser membros do time');
+        }
+
+        // Create the team payment
         const newTeamPayment = await TeamPayment.create({
-            teamId: teamPaymentData.teamId,
-            payerId: teamPaymentData.payerId,
-            debtorsIds: teamPaymentData.debtorsIds,
-            title: teamPaymentData.title,
-            amount: teamPaymentData.amount,
-            paymentDate: moment(teamPaymentData.paymentDate, 'YYYY-MM-DD').toDate(),
+            teamId,
+            payerId,
+            debtorsIds,
+            title,
+            amount,
+            paymentDate: moment().toDate(),
         });
 
         return newTeamPayment;
