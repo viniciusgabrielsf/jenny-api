@@ -77,4 +77,18 @@ export class TeamPaymentsController {
         res.status(200);
         res.json({ items, total });
     };
+
+    deleteTeamPayment = async (req: Request, res: Response): Promise<void> => {
+        const teamId = req.fullParams.teamId;
+        const paymentId = req.fullParams.paymentId;
+        const userId = req.user?.id;
+
+        if (!teamId) throw new NotFoundException('Time não encontrado');
+        if (!paymentId) throw new NotFoundException('Pagamento não encontrado');
+
+        await this.teamPaymentsService.deleteTeamPayment(teamId, paymentId, userId!);
+
+        res.status(200);
+        res.json({ message: 'Pagamento deletado com sucesso' });
+    };
 }

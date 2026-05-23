@@ -11,4 +11,5 @@ const teamPaymentsController = new TeamPaymentsController(new TeamPaymentsServic
 router.get('/', fowardParams, authentication, teamPaymentsController.getTeamPayments);
 router.post('/', fowardParams, authentication, teamPaymentsController.createTeamPayment);
 router.patch('/:paymentId', fowardParams, authentication, teamPaymentsController.updateTeamPayment);
+router.delete('/:paymentId', fowardParams, authentication, teamPaymentsController.deleteTeamPayment);
 export default router;
