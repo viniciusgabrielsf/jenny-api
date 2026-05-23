@@ -33,6 +33,8 @@ description: 'AI instructions for Jenny API (Copilot and Claude).'
 - Access and refresh JWTs live in httpOnly cookies; refresh cookie scoped to `/api/auth/refresh`.
 - Refresh tokens persisted in `auth_refresh_token` with `familyId`; keep rotation and cleanup (`MAX_TOKENS`).
 - If `req.user` changes, update [src/config/express.d.ts](src/config/express.d.ts).
+- if need to declare uuid whit zod. uses z.uuid.
+- if need to declare optional uuid with zod, uses z.preprocess(emptyStringToUndefined, z.uuid().optional()),
 
 ## Data and error handling
 
