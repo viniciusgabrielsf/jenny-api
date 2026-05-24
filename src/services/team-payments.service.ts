@@ -8,12 +8,18 @@ import { IGetOptions } from '../config/interfaces';
 import { buildBaseFindOptions } from '../helpers/get-options.helper';
 import { Op } from 'sequelize';
 import { TeamPaymentsFilterSchemaType } from '../helpers/schemas/team-payments/team-payments-filter.schema';
+import User from '../models/user.model';
 
 export type ITeamPaymentRequest = Omit<
     ITeamPayment,
     'id' | 'createdAt' | 'updatedAt' | 'paymentDate'
 > & {
     paymentDate: string;
+};
+
+export type ITeamPaymentResponse = ITeamPayment & {
+    debtors: User[];
+    payer: User;
 };
 
 export class TeamPaymentsService {
@@ -110,13 +116,36 @@ export class TeamPaymentsService {
 
     async getTeamPayments(
         options?: IGetOptions<TeamPaymentsFilterSchemaType>
-    ): Promise<{ items: ITeamPayment[]; total: number }> {
+    ): Promise<{ items: ITeamPaymentResponse[]; total: number }> {
         const findOptions = this.buildFindOptions(options);
 
-        const teamPayments = await TeamPayment.findAndCountAll(findOptions);
+        const teamPayments = await TeamPayment.findAndCountAll({
+            ...findOptions,
+            include: [
+                {
+                    model: User,
+                    as: 'payer',
+                    attributes: ['id', 'fullName', 'avatar'],
+                },
+            ],
+        });
+
+        // TODO refactor the way we get debtors for performance
+        const debtors = await User.findAll({
+            where: {
+                id: {
+                    [Op.in]: teamPayments.rows.flatMap(payment => payment.debtorsIds),
+                },
+            },
+            attributes: ['id', 'fullName', 'avatar'],
+        });
 
         return {
-            items: teamPayments.rows,
+            items: teamPayments.rows.map(payment => ({
+                ...payment.get(),
+                payer: payment.payer,
+                debtors: debtors.filter(debtor => payment.debtorsIds.includes(debtor.id)),
+            })),
             total: teamPayments.count,
         };
     }

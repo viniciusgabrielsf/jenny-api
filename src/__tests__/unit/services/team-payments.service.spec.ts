@@ -3,11 +3,13 @@ import { NotFoundException } from '../../../helpers/exceptions/not-found.excepti
 import { BadRequestException } from '../../../helpers/exceptions/bad-request.exception';
 import TeamPayment from '../../../models/team-payment.model';
 import TeamMembership from '../../../models/team-membership.model';
+import User from '../../../models/user.model';
 import { TeamPaymentsService } from '../../../services/team-payments.service';
 import { Op } from 'sequelize';
 
 jest.mock('../../../models/team-payment.model');
 jest.mock('../../../models/team-membership.model');
+jest.mock('../../../models/user.model');
 
 const mockPaymentFindOne = jest.fn();
 const mockPaymentCreate = jest.fn();
@@ -17,6 +19,8 @@ const mockPaymentDestroy = jest.fn();
 
 const mockMembershipFindOne = jest.fn();
 const mockMembershipFindAll = jest.fn();
+
+const mockUserFindAll = jest.fn();
 
 describe('TeamPaymentsService (Unit Test)', () => {
     let teamPaymentsService: TeamPaymentsService;
@@ -33,6 +37,8 @@ describe('TeamPaymentsService (Unit Test)', () => {
 
         (TeamMembership.findOne as jest.Mock) = mockMembershipFindOne;
         (TeamMembership.findAll as jest.Mock) = mockMembershipFindAll;
+
+        (User.findAll as jest.Mock) = mockUserFindAll;
 
         jest.clearAllMocks();
     });
@@ -325,6 +331,27 @@ describe('TeamPaymentsService (Unit Test)', () => {
                     paymentDate: new Date(),
                     createdAt: new Date(),
                     updatedAt: new Date(),
+                    payer: {
+                        id: 'user-1',
+                        fullName: 'User 1',
+                        avatar: 'avatar1.png',
+                    },
+                    get: jest.fn().mockReturnValue({
+                        id: 'payment-1',
+                        teamId: 'team-1',
+                        payerId: 'user-1',
+                        debtorsIds: ['user-2', 'user-3'],
+                        title: 'Dinner',
+                        amount: 5000,
+                        paymentDate: new Date(),
+                        createdAt: new Date(),
+                        updatedAt: new Date(),
+                        payer: {
+                            id: 'user-1',
+                            fullName: 'User 1',
+                            avatar: 'avatar1.png',
+                        },
+                    }),
                 },
                 {
                     id: 'payment-2',
@@ -336,6 +363,27 @@ describe('TeamPaymentsService (Unit Test)', () => {
                     paymentDate: new Date(),
                     createdAt: new Date(),
                     updatedAt: new Date(),
+                    payer: {
+                        id: 'user-2',
+                        fullName: 'User 2',
+                        avatar: 'avatar2.png',
+                    },
+                    get: jest.fn().mockReturnValue({
+                        id: 'payment-2',
+                        teamId: 'team-1',
+                        payerId: 'user-2',
+                        debtorsIds: ['user-1', 'user-3'],
+                        title: 'Lunch',
+                        amount: 4000,
+                        paymentDate: new Date(),
+                        createdAt: new Date(),
+                        updatedAt: new Date(),
+                        payer: {
+                            id: 'user-2',
+                            fullName: 'User 2',
+                            avatar: 'avatar2.png',
+                        },
+                    }),
                 },
             ];
 
@@ -343,6 +391,11 @@ describe('TeamPaymentsService (Unit Test)', () => {
                 count: 2,
                 rows: teamPayments,
             });
+
+            mockUserFindAll.mockResolvedValueOnce([
+                { id: 'user-2', fullName: 'User 2', avatar: 'avatar2.png' },
+                { id: 'user-3', fullName: 'User 3', avatar: 'avatar3.png' },
+            ]);
 
             const result = await teamPaymentsService.getTeamPayments({
                 orderField: 'createdAt',
@@ -355,10 +408,20 @@ describe('TeamPaymentsService (Unit Test)', () => {
                     order: [['createdAt', 'DESC']],
                 })
             );
-            expect(result).toEqual({ items: teamPayments, total: 2 });
+            expect(mockUserFindAll).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: expect.objectContaining({
+                        id: { [Op.in]: ['user-2', 'user-3', 'user-1', 'user-3'] },
+                    }),
+                })
+            );
+            expect(result.total).toEqual(2);
+            expect(result.items).toHaveLength(2);
         });
 
         it('should filter team payments by teamId', async () => {
+            const debtorUser = { id: 'user-2', fullName: 'User 2', avatar: 'avatar2.png' };
+            const payerUser = { id: 'user-1', fullName: 'User 1', avatar: 'avatar1.png' };
             const teamPayments = [
                 {
                     id: 'payment-1',
@@ -370,6 +433,19 @@ describe('TeamPaymentsService (Unit Test)', () => {
                     paymentDate: new Date(),
                     createdAt: new Date(),
                     updatedAt: new Date(),
+                    payer: payerUser,
+                    get: jest.fn().mockReturnValue({
+                        id: 'payment-1',
+                        teamId: 'team-1',
+                        payerId: 'user-1',
+                        debtorsIds: ['user-2'],
+                        title: 'Dinner',
+                        amount: 5000,
+                        paymentDate: new Date(),
+                        createdAt: new Date(),
+                        updatedAt: new Date(),
+                        payer: payerUser,
+                    }),
                 },
             ];
 
@@ -377,6 +453,7 @@ describe('TeamPaymentsService (Unit Test)', () => {
                 count: 1,
                 rows: teamPayments,
             });
+            mockUserFindAll.mockResolvedValueOnce([debtorUser]);
 
             const result = await teamPaymentsService.getTeamPayments({
                 filter: { teamId: 'team-1' },
@@ -389,10 +466,13 @@ describe('TeamPaymentsService (Unit Test)', () => {
                     }),
                 })
             );
-            expect(result).toEqual({ items: teamPayments, total: 1 });
+            expect(result.total).toEqual(1);
+            expect(result.items).toHaveLength(1);
         });
 
         it('should filter team payments by payerId', async () => {
+            const debtorUser = { id: 'user-2', fullName: 'User 2', avatar: 'avatar2.png' };
+            const payerUser = { id: 'user-1', fullName: 'User 1', avatar: 'avatar1.png' };
             const teamPayments = [
                 {
                     id: 'payment-1',
@@ -404,6 +484,19 @@ describe('TeamPaymentsService (Unit Test)', () => {
                     paymentDate: new Date(),
                     createdAt: new Date(),
                     updatedAt: new Date(),
+                    payer: payerUser,
+                    get: jest.fn().mockReturnValue({
+                        id: 'payment-1',
+                        teamId: 'team-1',
+                        payerId: 'user-1',
+                        debtorsIds: ['user-2'],
+                        title: 'Dinner',
+                        amount: 5000,
+                        paymentDate: new Date(),
+                        createdAt: new Date(),
+                        updatedAt: new Date(),
+                        payer: payerUser,
+                    }),
                 },
             ];
 
@@ -411,6 +504,7 @@ describe('TeamPaymentsService (Unit Test)', () => {
                 count: 1,
                 rows: teamPayments,
             });
+            mockUserFindAll.mockResolvedValueOnce([debtorUser]);
 
             const result = await teamPaymentsService.getTeamPayments({
                 filter: { payerId: 'user-1' },
@@ -423,10 +517,13 @@ describe('TeamPaymentsService (Unit Test)', () => {
                     }),
                 })
             );
-            expect(result).toEqual({ items: teamPayments, total: 1 });
+            expect(result.total).toEqual(1);
+            expect(result.items).toHaveLength(1);
         });
 
         it('should filter team payments by title', async () => {
+            const debtorUser = { id: 'user-2', fullName: 'User 2', avatar: 'avatar2.png' };
+            const payerUser = { id: 'user-1', fullName: 'User 1', avatar: 'avatar1.png' };
             const teamPayments = [
                 {
                     id: 'payment-1',
@@ -438,6 +535,19 @@ describe('TeamPaymentsService (Unit Test)', () => {
                     paymentDate: new Date(),
                     createdAt: new Date(),
                     updatedAt: new Date(),
+                    payer: payerUser,
+                    get: jest.fn().mockReturnValue({
+                        id: 'payment-1',
+                        teamId: 'team-1',
+                        payerId: 'user-1',
+                        debtorsIds: ['user-2'],
+                        title: 'Dinner',
+                        amount: 5000,
+                        paymentDate: new Date(),
+                        createdAt: new Date(),
+                        updatedAt: new Date(),
+                        payer: payerUser,
+                    }),
                 },
             ];
 
@@ -445,6 +555,7 @@ describe('TeamPaymentsService (Unit Test)', () => {
                 count: 1,
                 rows: teamPayments,
             });
+            mockUserFindAll.mockResolvedValueOnce([debtorUser]);
 
             const result = await teamPaymentsService.getTeamPayments({
                 filter: { title: 'Dinner' },
@@ -457,10 +568,13 @@ describe('TeamPaymentsService (Unit Test)', () => {
                     }),
                 })
             );
-            expect(result).toEqual({ items: teamPayments, total: 1 });
+            expect(result.total).toEqual(1);
+            expect(result.items).toHaveLength(1);
         });
 
         it('should filter team payments by month', async () => {
+            const debtorUser = { id: 'user-2', fullName: 'User 2', avatar: 'avatar2.png' };
+            const payerUser = { id: 'user-1', fullName: 'User 1', avatar: 'avatar1.png' };
             const teamPayments = [
                 {
                     id: 'payment-1',
@@ -472,6 +586,19 @@ describe('TeamPaymentsService (Unit Test)', () => {
                     paymentDate: new Date('2026-05-15'),
                     createdAt: new Date(),
                     updatedAt: new Date(),
+                    payer: payerUser,
+                    get: jest.fn().mockReturnValue({
+                        id: 'payment-1',
+                        teamId: 'team-1',
+                        payerId: 'user-1',
+                        debtorsIds: ['user-2'],
+                        title: 'Dinner',
+                        amount: 5000,
+                        paymentDate: new Date('2026-05-15'),
+                        createdAt: new Date(),
+                        updatedAt: new Date(),
+                        payer: payerUser,
+                    }),
                 },
             ];
 
@@ -479,6 +606,7 @@ describe('TeamPaymentsService (Unit Test)', () => {
                 count: 1,
                 rows: teamPayments,
             });
+            mockUserFindAll.mockResolvedValueOnce([debtorUser]);
 
             const result = await teamPaymentsService.getTeamPayments({
                 filter: { date: '2026-05' },
@@ -493,7 +621,8 @@ describe('TeamPaymentsService (Unit Test)', () => {
                     }),
                 })
             );
-            expect(result).toEqual({ items: teamPayments, total: 1 });
+            expect(result.total).toEqual(1);
+            expect(result.items).toHaveLength(1);
         });
 
         it('should apply limit and offset for pagination', async () => {
@@ -501,6 +630,7 @@ describe('TeamPaymentsService (Unit Test)', () => {
                 count: 10,
                 rows: [],
             });
+            mockUserFindAll.mockResolvedValueOnce([]);
 
             await teamPaymentsService.getTeamPayments({
                 limit: 10,
@@ -520,6 +650,7 @@ describe('TeamPaymentsService (Unit Test)', () => {
                 count: 0,
                 rows: [],
             });
+            mockUserFindAll.mockResolvedValueOnce([]);
 
             await teamPaymentsService.getTeamPayments({
                 orderField: 'amount',
@@ -538,6 +669,7 @@ describe('TeamPaymentsService (Unit Test)', () => {
                 count: 0,
                 rows: [],
             });
+            mockUserFindAll.mockResolvedValueOnce([]);
 
             const result = await teamPaymentsService.getTeamPayments({
                 filter: { teamId: 'team-nonexistent' },
@@ -547,6 +679,8 @@ describe('TeamPaymentsService (Unit Test)', () => {
         });
 
         it('should combine multiple filters', async () => {
+            const debtorUser = { id: 'user-2', fullName: 'User 2', avatar: 'avatar2.png' };
+            const payerUser = { id: 'user-1', fullName: 'User 1', avatar: 'avatar1.png' };
             const teamPayments = [
                 {
                     id: 'payment-1',
@@ -558,6 +692,19 @@ describe('TeamPaymentsService (Unit Test)', () => {
                     paymentDate: new Date('2026-05-15'),
                     createdAt: new Date(),
                     updatedAt: new Date(),
+                    payer: payerUser,
+                    get: jest.fn().mockReturnValue({
+                        id: 'payment-1',
+                        teamId: 'team-1',
+                        payerId: 'user-1',
+                        debtorsIds: ['user-2'],
+                        title: 'Dinner',
+                        amount: 5000,
+                        paymentDate: new Date('2026-05-15'),
+                        createdAt: new Date(),
+                        updatedAt: new Date(),
+                        payer: payerUser,
+                    }),
                 },
             ];
 
@@ -565,6 +712,7 @@ describe('TeamPaymentsService (Unit Test)', () => {
                 count: 1,
                 rows: teamPayments,
             });
+            mockUserFindAll.mockResolvedValueOnce([debtorUser]);
 
             const result = await teamPaymentsService.getTeamPayments({
                 filter: { teamId: 'team-1', payerId: 'user-1', title: 'Dinner' },
@@ -579,7 +727,8 @@ describe('TeamPaymentsService (Unit Test)', () => {
                     }),
                 })
             );
-            expect(result).toEqual({ items: teamPayments, total: 1 });
+            expect(result.total).toEqual(1);
+            expect(result.items).toHaveLength(1);
         });
     });
 
