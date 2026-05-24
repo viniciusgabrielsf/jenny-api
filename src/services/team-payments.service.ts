@@ -114,6 +114,24 @@ export class TeamPaymentsService {
         return existingTeamPayment;
     }
 
+    async deleteTeamPayment(teamId: string, paymentId: string, userId: string): Promise<void> {
+        const isMember = await TeamMembership.findOne({
+            where: { teamId, userId },
+        });
+
+        if (!isMember) {
+            throw new BadRequestException('Você não é membro deste time');
+        }
+
+        const payment = await TeamPayment.findOne({ where: { id: paymentId, teamId } });
+
+        if (!payment) {
+            throw new NotFoundException('Pagamento do time não encontrado');
+        }
+
+        await TeamPayment.destroy({ where: { id: paymentId } });
+    }
+
     async getTeamPayments(
         options?: IGetOptions<TeamPaymentsFilterSchemaType>
     ): Promise<{ items: ITeamPaymentResponse[]; total: number }> {
@@ -148,24 +166,6 @@ export class TeamPaymentsService {
             })),
             total: teamPayments.count,
         };
-    }
-
-    async deleteTeamPayment(teamId: string, paymentId: string, userId: string): Promise<void> {
-        const isMember = await TeamMembership.findOne({
-            where: { teamId, userId },
-        });
-
-        if (!isMember) {
-            throw new BadRequestException('Você não é membro deste time');
-        }
-
-        const payment = await TeamPayment.findOne({ where: { id: paymentId, teamId } });
-
-        if (!payment) {
-            throw new NotFoundException('Pagamento do time não encontrado');
-        }
-
-        await TeamPayment.destroy({ where: { id: paymentId } });
     }
 
     buildFindOptions = (options?: IGetOptions<TeamPaymentsFilterSchemaType>): FindOptions => {
