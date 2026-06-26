@@ -67,7 +67,7 @@ export class TeamPaymentsController {
             throw new BadRequestException('Parâmetros de consulta inválidos');
         }
 
-        const { items, total } = await this.teamPaymentsService.getTeamPayments({
+        const { items, total, balances } = await this.teamPaymentsService.getTeamPayments({
             ...options,
             filter,
         });
@@ -75,7 +75,7 @@ export class TeamPaymentsController {
         if (!items) throw new NotFoundException('Pagamentos não encontrados');
 
         res.status(200);
-        res.json({ items, total });
+        res.json({ items, total, balances });
     };
 
     deleteTeamPayment = async (req: Request, res: Response): Promise<void> => {
