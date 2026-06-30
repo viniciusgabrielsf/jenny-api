@@ -3,13 +3,14 @@ import { NotFoundException } from '../../../helpers/exceptions/not-found.excepti
 import { BadRequestException } from '../../../helpers/exceptions/bad-request.exception';
 import TeamPayment from '../../../models/team-payment.model';
 import TeamMembership from '../../../models/team-membership.model';
-import User from '../../../models/user.model';
+import Team from '../../../models/team.model';
 import { TeamPaymentsService } from '../../../services/team-payments.service';
 import { Op } from 'sequelize';
 
 jest.mock('../../../models/team-payment.model');
 jest.mock('../../../models/team-membership.model');
 jest.mock('../../../models/user.model');
+jest.mock('../../../models/team.model');
 
 const mockPaymentFindOne = jest.fn();
 const mockPaymentCreate = jest.fn();
@@ -20,7 +21,45 @@ const mockPaymentDestroy = jest.fn();
 const mockMembershipFindOne = jest.fn();
 const mockMembershipFindAll = jest.fn();
 
-const mockUserFindAll = jest.fn();
+const mockTeamFindOne = jest.fn();
+
+// Builds a User-like object as returned by the included associations.
+const makeUser = (id: string) => ({ id, fullName: `User ${id}`, avatar: `${id}.png` });
+
+// Builds a TeamPayment row matching what Sequelize returns (with a .get()).
+const makePaymentRow = (p: {
+    id: string;
+    payerId: string;
+    debtorsIds: string[];
+    amount: number;
+    title?: string;
+    teamId?: string;
+    paymentDate?: Date;
+}) => {
+    const data = {
+        id: p.id,
+        teamId: p.teamId ?? 'team-1',
+        payerId: p.payerId,
+        debtorsIds: p.debtorsIds,
+        title: p.title ?? 'Expense',
+        amount: p.amount,
+        paymentDate: p.paymentDate ?? new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        payer: makeUser(p.payerId),
+    };
+    return { ...data, get: jest.fn().mockReturnValue({ ...data }) };
+};
+
+// Builds the Team.findOne result carrying the memberships -> user graph.
+const makeTeam = (memberIds: string[]) => ({
+    id: 'team-1',
+    memberships: memberIds.map(id => ({ teamId: 'team-1', userId: id, user: makeUser(id) })),
+});
+
+// Normalizes a balance into a comparable string so assertions ignore ordering.
+const balanceKey = (b: { from: { id: string }; to: { id: string }; amount: number }) =>
+    `${b.from.id}->${b.to.id}:${b.amount}`;
 
 describe('TeamPaymentsService (Unit Test)', () => {
     let teamPaymentsService: TeamPaymentsService;
@@ -38,7 +77,7 @@ describe('TeamPaymentsService (Unit Test)', () => {
         (TeamMembership.findOne as jest.Mock) = mockMembershipFindOne;
         (TeamMembership.findAll as jest.Mock) = mockMembershipFindAll;
 
-        (User.findAll as jest.Mock) = mockUserFindAll;
+        (Team.findOne as jest.Mock) = mockTeamFindOne;
 
         jest.clearAllMocks();
     });
@@ -392,10 +431,7 @@ describe('TeamPaymentsService (Unit Test)', () => {
                 rows: teamPayments,
             });
 
-            mockUserFindAll.mockResolvedValueOnce([
-                { id: 'user-2', fullName: 'User 2', avatar: 'avatar2.png' },
-                { id: 'user-3', fullName: 'User 3', avatar: 'avatar3.png' },
-            ]);
+            mockTeamFindOne.mockResolvedValueOnce(makeTeam(['user-1', 'user-2', 'user-3']));
 
             const result = await teamPaymentsService.getTeamPayments({
                 orderField: 'createdAt',
@@ -408,19 +444,11 @@ describe('TeamPaymentsService (Unit Test)', () => {
                     order: [['createdAt', 'DESC']],
                 })
             );
-            expect(mockUserFindAll).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    where: expect.objectContaining({
-                        id: { [Op.in]: ['user-2', 'user-3', 'user-1', 'user-3'] },
-                    }),
-                })
-            );
             expect(result.total).toEqual(2);
             expect(result.items).toHaveLength(2);
         });
 
         it('should filter team payments by teamId', async () => {
-            const debtorUser = { id: 'user-2', fullName: 'User 2', avatar: 'avatar2.png' };
             const payerUser = { id: 'user-1', fullName: 'User 1', avatar: 'avatar1.png' };
             const teamPayments = [
                 {
@@ -453,7 +481,7 @@ describe('TeamPaymentsService (Unit Test)', () => {
                 count: 1,
                 rows: teamPayments,
             });
-            mockUserFindAll.mockResolvedValueOnce([debtorUser]);
+            mockTeamFindOne.mockResolvedValueOnce(makeTeam(['user-1', 'user-2']));
 
             const result = await teamPaymentsService.getTeamPayments({
                 filter: { teamId: 'team-1' },
@@ -471,7 +499,6 @@ describe('TeamPaymentsService (Unit Test)', () => {
         });
 
         it('should filter team payments by payerId', async () => {
-            const debtorUser = { id: 'user-2', fullName: 'User 2', avatar: 'avatar2.png' };
             const payerUser = { id: 'user-1', fullName: 'User 1', avatar: 'avatar1.png' };
             const teamPayments = [
                 {
@@ -504,7 +531,7 @@ describe('TeamPaymentsService (Unit Test)', () => {
                 count: 1,
                 rows: teamPayments,
             });
-            mockUserFindAll.mockResolvedValueOnce([debtorUser]);
+            mockTeamFindOne.mockResolvedValueOnce(makeTeam(['user-1', 'user-2']));
 
             const result = await teamPaymentsService.getTeamPayments({
                 filter: { payerId: 'user-1' },
@@ -522,7 +549,6 @@ describe('TeamPaymentsService (Unit Test)', () => {
         });
 
         it('should filter team payments by title', async () => {
-            const debtorUser = { id: 'user-2', fullName: 'User 2', avatar: 'avatar2.png' };
             const payerUser = { id: 'user-1', fullName: 'User 1', avatar: 'avatar1.png' };
             const teamPayments = [
                 {
@@ -555,7 +581,7 @@ describe('TeamPaymentsService (Unit Test)', () => {
                 count: 1,
                 rows: teamPayments,
             });
-            mockUserFindAll.mockResolvedValueOnce([debtorUser]);
+            mockTeamFindOne.mockResolvedValueOnce(makeTeam(['user-1', 'user-2']));
 
             const result = await teamPaymentsService.getTeamPayments({
                 filter: { title: 'Dinner' },
@@ -573,7 +599,6 @@ describe('TeamPaymentsService (Unit Test)', () => {
         });
 
         it('should filter team payments by month', async () => {
-            const debtorUser = { id: 'user-2', fullName: 'User 2', avatar: 'avatar2.png' };
             const payerUser = { id: 'user-1', fullName: 'User 1', avatar: 'avatar1.png' };
             const teamPayments = [
                 {
@@ -606,7 +631,7 @@ describe('TeamPaymentsService (Unit Test)', () => {
                 count: 1,
                 rows: teamPayments,
             });
-            mockUserFindAll.mockResolvedValueOnce([debtorUser]);
+            mockTeamFindOne.mockResolvedValueOnce(makeTeam(['user-1', 'user-2']));
 
             const result = await teamPaymentsService.getTeamPayments({
                 filter: { date: '2026-05' },
@@ -630,7 +655,7 @@ describe('TeamPaymentsService (Unit Test)', () => {
                 count: 10,
                 rows: [],
             });
-            mockUserFindAll.mockResolvedValueOnce([]);
+            mockTeamFindOne.mockResolvedValueOnce(makeTeam([]));
 
             await teamPaymentsService.getTeamPayments({
                 limit: 10,
@@ -650,7 +675,7 @@ describe('TeamPaymentsService (Unit Test)', () => {
                 count: 0,
                 rows: [],
             });
-            mockUserFindAll.mockResolvedValueOnce([]);
+            mockTeamFindOne.mockResolvedValueOnce(makeTeam([]));
 
             await teamPaymentsService.getTeamPayments({
                 orderField: 'amount',
@@ -669,17 +694,16 @@ describe('TeamPaymentsService (Unit Test)', () => {
                 count: 0,
                 rows: [],
             });
-            mockUserFindAll.mockResolvedValueOnce([]);
+            mockTeamFindOne.mockResolvedValueOnce(makeTeam([]));
 
             const result = await teamPaymentsService.getTeamPayments({
                 filter: { teamId: 'team-nonexistent' },
             });
 
-            expect(result).toEqual({ items: [], total: 0 });
+            expect(result).toEqual({ items: [], total: 0, balances: [] });
         });
 
         it('should combine multiple filters', async () => {
-            const debtorUser = { id: 'user-2', fullName: 'User 2', avatar: 'avatar2.png' };
             const payerUser = { id: 'user-1', fullName: 'User 1', avatar: 'avatar1.png' };
             const teamPayments = [
                 {
@@ -712,7 +736,7 @@ describe('TeamPaymentsService (Unit Test)', () => {
                 count: 1,
                 rows: teamPayments,
             });
-            mockUserFindAll.mockResolvedValueOnce([debtorUser]);
+            mockTeamFindOne.mockResolvedValueOnce(makeTeam(['user-1', 'user-2']));
 
             const result = await teamPaymentsService.getTeamPayments({
                 filter: { teamId: 'team-1', payerId: 'user-1', title: 'Dinner' },
@@ -729,6 +753,85 @@ describe('TeamPaymentsService (Unit Test)', () => {
             );
             expect(result.total).toEqual(1);
             expect(result.items).toHaveLength(1);
+        });
+    });
+
+    describe('settleUpPayments (debt simplification via getTeamPayments)', () => {
+        // Drives the private min-cost-flow settlement through the public API and
+        // asserts on the returned balances.
+        const settle = async (
+            memberIds: string[],
+            payments: Parameters<typeof makePaymentRow>[0][]
+        ) => {
+            mockPaymentFindAndCountAll.mockResolvedValueOnce({
+                count: payments.length,
+                rows: payments.map(makePaymentRow),
+            });
+            mockTeamFindOne.mockResolvedValueOnce(makeTeam(memberIds));
+
+            const result = await teamPaymentsService.getTeamPayments({
+                filter: { teamId: 'team-1' },
+            });
+            return result.balances;
+        };
+
+        it('produces a single transfer for one shared expense', async () => {
+            const balances = await settle(
+                ['A', 'B'],
+                [{ id: 'p1', payerId: 'A', debtorsIds: ['A', 'B'], amount: 100 }]
+            );
+
+            expect(balances.map(balanceKey)).toEqual(['B->A:50']);
+        });
+
+        it('keeps debts as a chain when no direct debt exists (interpretability constraint)', async () => {
+            // A owes B, B owes C. A never owed C, so A must not pay C directly.
+            const balances = await settle(
+                ['A', 'B', 'C'],
+                [
+                    { id: 'p1', payerId: 'B', debtorsIds: ['A'], amount: 10 },
+                    { id: 'p2', payerId: 'C', debtorsIds: ['B'], amount: 10 },
+                ]
+            );
+
+            expect(balances.map(balanceKey).sort()).toEqual(['A->B:10', 'B->C:10']);
+        });
+
+        it('nets antiparallel debts into a single transfer', async () => {
+            // A owes B 5 and B owes A 3 -> a lone A->B:2 transfer.
+            const balances = await settle(
+                ['A', 'B'],
+                [
+                    { id: 'p1', payerId: 'B', debtorsIds: ['A'], amount: 5 },
+                    { id: 'p2', payerId: 'A', debtorsIds: ['B'], amount: 3 },
+                ]
+            );
+
+            expect(balances.map(balanceKey)).toEqual(['A->B:2']);
+        });
+
+        it('distributes an indivisible remainder so the books stay balanced', async () => {
+            const balances = await settle(
+                ['A', 'B', 'C', 'D'],
+                [{ id: 'p1', payerId: 'D', debtorsIds: ['A', 'B', 'C'], amount: 10 }]
+            );
+
+            expect(balances.map(balanceKey).sort()).toEqual(['A->D:4', 'B->D:3', 'C->D:3']);
+            // Nothing leaks: the creditor receives exactly the full amount.
+            const totalReceived = balances.reduce((sum, b) => sum + b.amount, 0);
+            expect(totalReceived).toBe(10);
+        });
+
+        it('returns no transactions when everyone is already settled', async () => {
+            const balances = await settle(
+                ['A', 'B'],
+                [
+                    { id: 'p1', payerId: 'A', debtorsIds: ['A', 'B'], amount: 100 },
+                    { id: 'p2', payerId: 'B', debtorsIds: ['A', 'B'], amount: 100 },
+                ]
+            );
+
+            expect(balances).toEqual([]);
         });
     });
 

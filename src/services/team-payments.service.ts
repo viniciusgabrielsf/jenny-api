@@ -36,6 +36,17 @@ export type MinCostFlowEdge = {
     flow: number;
 };
 
+type FlowEdge = {
+    to: string;
+    capacity: number;
+    flow: number;
+    cost: number;
+    // Index of the matching reverse edge inside graph.get(to) — lets us refund flow in O(1).
+    rev: number;
+    // Real debt/source/sink edge (a candidate transaction) vs. a residual edge used only for routing.
+    isReal: boolean;
+};
+
 export type ITeamPaymentResponse = ITeamPayment & {
     debtors: User[];
     payer: User;
@@ -243,14 +254,17 @@ export class TeamPaymentsService {
     }
 
     private buildFlowNetwork(originalPayments: TeamPayment[], members: User[]) {
-        // Initialize residual graph
-        const graph = new Map<string, Map<string, { capacity: number; flow: number }>>();
+        // Residual graph as an adjacency list. Adjacency lists (rather than a
+        // from->to->edge map) are required so a real edge and its residual edge
+        // can coexist for the same ordered pair, and so antiparallel debts
+        // (A owes B *and* B owes A) are kept as two independent real edges.
+        const graph = new Map<string, FlowEdge[]>();
         const netChanges = new Map<string, number>();
 
         // Initialize all vertices
         const allVertices = ['source', 'sink', ...members.map(m => m.id)];
         for (const vertex of allVertices) {
-            graph.set(vertex, new Map());
+            graph.set(vertex, []);
             if (vertex !== 'source' && vertex !== 'sink') {
                 netChanges.set(vertex, 0);
             }
@@ -258,62 +272,80 @@ export class TeamPaymentsService {
 
         // Build edges from original payments
         for (const originalPayment of originalPayments) {
-            const mod = originalPayment.amount % originalPayment.debtorsIds.length;
-            const amountPerDebtor =
-                (originalPayment.amount - mod) / originalPayment.debtorsIds.length;
+            const debtorCount = originalPayment.debtorsIds.length;
+            const baseShare = Math.floor(originalPayment.amount / debtorCount);
+            // Units that don't divide evenly are handed out one-by-one to the first
+            // `remainder` debtors so the books stay balanced (sum of shares === amount).
+            const remainder = originalPayment.amount - baseShare * debtorCount;
 
-            // Update net changes for payer (receives full amount + mod goes to payer's account)
+            // Payer is credited the full amount.
             netChanges.set(
                 originalPayment.payerId,
                 (netChanges.get(originalPayment.payerId) || 0) + originalPayment.amount
             );
 
-            for (const debtorId of originalPayment.debtorsIds) {
+            for (let i = 0; i < debtorCount; i++) {
+                const debtorId = originalPayment.debtorsIds[i];
+                const share = baseShare + (i < remainder ? 1 : 0);
+
                 // Update net change for debtor (owes their share)
-                netChanges.set(debtorId, (netChanges.get(debtorId) || 0) - amountPerDebtor);
+                netChanges.set(debtorId, (netChanges.get(debtorId) || 0) - share);
 
                 if (debtorId === originalPayment.payerId) continue; // Skip self loops
 
-                // Add or update edge capacity in residual graph
-                this.addOrUpdateEdge(graph, debtorId, originalPayment.payerId, amountPerDebtor);
+                // Real debt edge: one monetary transaction, so cost 1.
+                this.addEdge(graph, debtorId, originalPayment.payerId, share, 1);
             }
         }
 
         // Connect source to users with negative net change (debtors)
-        // Connect users with positive net change (creditors) to sink
+        // Connect users with positive net change (creditors) to sink.
+        // These are artificial edges, not transactions, so their cost is 0.
         for (const [userId, netChange] of netChanges.entries()) {
             if (netChange < 0) {
                 // User owes money: source -> user with capacity |netChange|
-                this.addOrUpdateEdge(graph, 'source', userId, Math.abs(netChange));
+                this.addEdge(graph, 'source', userId, Math.abs(netChange), 0);
             } else if (netChange > 0) {
                 // User should receive money: user -> sink with capacity netChange
-                this.addOrUpdateEdge(graph, userId, 'sink', netChange);
+                this.addEdge(graph, userId, 'sink', netChange, 0);
             }
         }
 
         return { graph, netChanges };
     }
 
-    private addOrUpdateEdge(
-        graph: Map<string, Map<string, { capacity: number; flow: number }>>,
+    private addEdge(
+        graph: Map<string, FlowEdge[]>,
         from: string,
         to: string,
-        capacity: number
+        capacity: number,
+        cost: number
     ): void {
-        const fromNode = graph.get(from)!;
-        const existingEdge = fromNode.get(to);
+        const fromList = graph.get(from)!;
 
-        if (existingEdge) {
-            existingEdge.capacity += capacity;
-        } else {
-            fromNode.set(to, { capacity, flow: 0 });
-            // Initialize reverse edge for residual graph
-            graph.get(to)!.set(from, { capacity: 0, flow: 0 });
+        // Merge parallel debts in the same direction so the settlement keeps a
+        // single transaction per ordered pair.
+        const existing = fromList.find(e => e.isReal && e.to === to);
+        if (existing) {
+            existing.capacity += capacity;
+            return;
         }
+
+        const toList = graph.get(to)!;
+        fromList.push({ to, capacity, flow: 0, cost, rev: toList.length, isReal: true });
+        // Residual edge: zero capacity and negated cost so cancelling flow refunds its cost.
+        toList.push({
+            to: from,
+            capacity: 0,
+            flow: 0,
+            cost: -cost,
+            rev: fromList.length - 1,
+            isReal: false,
+        });
     }
 
     private successiveShortestPath(
-        graph: Map<string, Map<string, { capacity: number; flow: number }>>,
+        graph: Map<string, FlowEdge[]>,
         source: string,
         sink: string,
         netChanges: Map<string, number>
@@ -324,34 +356,36 @@ export class TeamPaymentsService {
 
         let currentFlow = 0;
 
+        // Johnson potentials let us route with Dijkstra even though residual edges
+        // carry negative cost. They start at 0 (no negative-cost edge is usable yet).
+        const potential = new Map<string, number>();
+        for (const vertex of graph.keys()) potential.set(vertex, 0);
+
         while (currentFlow < totalFlow) {
-            // Find shortest path using BFS (all edge costs are 1)
-            const path = this.findShortestPath(graph, source, sink);
+            const { dist, prevNode, prevEdgeIdx } = this.dijkstra(graph, source, potential);
 
-            if (!path) {
-                // No more augmenting paths
-                break;
+            // No remaining augmenting path. The balanced construction guarantees we
+            // always reach totalFlow, but guard against it to avoid an infinite loop.
+            if (dist.get(sink) === Infinity) break;
+
+            // Shift potentials by the latest shortest-path distances (keeps reduced costs >= 0).
+            for (const [vertex, d] of dist.entries()) {
+                if (d < Infinity) potential.set(vertex, potential.get(vertex)! + d);
             }
 
-            // Find bottleneck capacity along the path
-            let bottleneck = Infinity;
-            for (let i = 0; i < path.length - 1; i++) {
-                const from = path[i];
-                const to = path[i + 1];
-                const edge = graph.get(from)!.get(to)!;
-                const residualCapacity = edge.capacity - edge.flow;
-                bottleneck = Math.min(bottleneck, residualCapacity);
+            // Bottleneck residual capacity along the chosen path.
+            let bottleneck = totalFlow - currentFlow;
+            for (let node = sink; node !== source; node = prevNode.get(node)!) {
+                const edge = graph.get(prevNode.get(node)!)![prevEdgeIdx.get(node)!];
+                bottleneck = Math.min(bottleneck, edge.capacity - edge.flow);
             }
 
-            // Push flow along the path
-            for (let i = 0; i < path.length - 1; i++) {
-                const from = path[i];
-                const to = path[i + 1];
-                const edge = graph.get(from)!.get(to)!;
-                const reverseEdge = graph.get(to)!.get(from)!;
-
+            // Push flow forward and refund it on the reverse (residual) edge. Using
+            // antisymmetric flow means extractFinalFlow reads the true net flow.
+            for (let node = sink; node !== source; node = prevNode.get(node)!) {
+                const edge = graph.get(prevNode.get(node)!)![prevEdgeIdx.get(node)!];
                 edge.flow += bottleneck;
-                reverseEdge.capacity += bottleneck;
+                graph.get(edge.to)![edge.rev].flow -= bottleneck;
             }
 
             currentFlow += bottleneck;
@@ -360,58 +394,70 @@ export class TeamPaymentsService {
         return this.extractFinalFlow(graph);
     }
 
-    // TODO optimize with Dijkstra's algorithm and potentials for better performance on larger graphs
-    // TODO use max capacity as draw settlement for two paths with same start and end to reduce number of transactions
-    private findShortestPath(
-        graph: Map<string, Map<string, { capacity: number; flow: number }>>,
+    // Shortest path by reduced cost over the residual graph (Dijkstra + Johnson potentials).
+    // TODO use max capacity as a tie-breaker between equal-cost paths to further reduce transactions
+    private dijkstra(
+        graph: Map<string, FlowEdge[]>,
         source: string,
-        sink: string
-    ): string[] | null {
-        const queue: string[] = [source];
-        const visited = new Set<string>([source]);
-        const parent = new Map<string, string>();
+        potential: Map<string, number>
+    ): {
+        dist: Map<string, number>;
+        prevNode: Map<string, string>;
+        prevEdgeIdx: Map<string, number>;
+    } {
+        const dist = new Map<string, number>();
+        const prevNode = new Map<string, string>();
+        const prevEdgeIdx = new Map<string, number>();
+        const visited = new Set<string>();
 
-        while (queue.length > 0) {
-            const current = queue.shift()!;
+        for (const vertex of graph.keys()) dist.set(vertex, Infinity);
+        dist.set(source, 0);
 
-            if (current === sink) {
-                // Reconstruct path
-                const path: string[] = [];
-                let node: string | undefined = sink;
-                while (node) {
-                    path.unshift(node);
-                    node = parent.get(node);
+        while (true) {
+            // Pick the unvisited vertex with the smallest tentative distance.
+            // O(V^2) is fine here: a team has few members, so the graph is tiny.
+            let current: string | null = null;
+            let best = Infinity;
+            for (const [vertex, d] of dist.entries()) {
+                if (!visited.has(vertex) && d < best) {
+                    best = d;
+                    current = vertex;
                 }
-                return path;
             }
+            if (current === null) break;
+            visited.add(current);
 
-            // Explore neighbors with available capacity
-            const neighbors = graph.get(current)!;
-            for (const [neighbor, edge] of neighbors.entries()) {
-                const residualCapacity = edge.capacity - edge.flow;
-                if (!visited.has(neighbor) && residualCapacity > 0) {
-                    visited.add(neighbor);
-                    parent.set(neighbor, current);
-                    queue.push(neighbor);
+            const edges = graph.get(current)!;
+            for (let i = 0; i < edges.length; i++) {
+                const edge = edges[i];
+                if (edge.capacity - edge.flow <= 0) continue; // no residual capacity
+
+                // Reduced cost is kept non-negative by the potentials.
+                const reducedCost =
+                    edge.cost + potential.get(current)! - potential.get(edge.to)!;
+                const candidate = dist.get(current)! + reducedCost;
+                if (candidate < dist.get(edge.to)!) {
+                    dist.set(edge.to, candidate);
+                    prevNode.set(edge.to, current);
+                    prevEdgeIdx.set(edge.to, i);
                 }
             }
         }
 
-        return null; // No path found
+        return { dist, prevNode, prevEdgeIdx };
     }
 
-    // Extract final flow edges (excluding source and sink, only include positive flows between users)
-    private extractFinalFlow(
-        graph: Map<string, Map<string, { capacity: number; flow: number }>>
-    ): MinCostFlowEdge[] {
+    // Extract final flow edges (excluding source and sink, only real edges with positive net flow)
+    private extractFinalFlow(graph: Map<string, FlowEdge[]>): MinCostFlowEdge[] {
         const resultFlow: MinCostFlowEdge[] = [];
-        for (const [from, neighbors] of graph.entries()) {
+        for (const [from, edges] of graph.entries()) {
             if (from === 'source' || from === 'sink') continue;
 
-            for (const [to, edge] of neighbors.entries()) {
-                if (to === 'source' || to === 'sink') continue;
-                if (edge.flow > 0) {
-                    resultFlow.push({ from, to, flow: edge.flow });
+            for (const edge of edges) {
+                if (edge.to === 'source' || edge.to === 'sink') continue;
+                // Only real edges are transactions; residual edges hold negative flow.
+                if (edge.isReal && edge.flow > 0) {
+                    resultFlow.push({ from, to: edge.to, flow: edge.flow });
                 }
             }
         }
