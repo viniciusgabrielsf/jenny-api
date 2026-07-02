@@ -43,7 +43,14 @@ export default class Payment extends Model {
     @Column({ field: 'title', allowNull: false, type: DataTypes.TEXT })
     title!: string;
 
-    @Column({ field: 'amount', allowNull: false, type: DataTypes.DECIMAL(10, 2) })
+    @Column({
+        field: 'amount',
+        allowNull: false,
+        type: DataTypes.INTEGER,
+        validate: {
+            min: 1,
+        },
+    })
     amount!: number;
 
     @Column({ field: 'payment_date', allowNull: false, type: DataTypes.DATE })

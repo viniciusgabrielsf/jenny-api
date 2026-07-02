@@ -6,6 +6,7 @@ import { NotFoundException } from '../helpers/exceptions/not-found.exception';
 import { IGetOptions } from '../config/interfaces';
 import { buildBaseFindOptions } from '../helpers/get-options.helper';
 import { GetUsersFilterSchemaType } from '../helpers/schemas/users/get-users.schema';
+import TeamMembership from '../models/team-membership.model';
 
 export type UsersListResponse = {
     items: IUser[];
@@ -16,24 +17,42 @@ export class UsersService {
     constructor() {}
 
     async getUsers(options?: IGetOptions<GetUsersFilterSchemaType>): Promise<UsersListResponse> {
-        const where: any = {};
+        const findOptions = await this.buildGetUsersFindOptions(options);
 
-        if (options?.filter?.search) {
-            where[Op.or] = [
-                { email: { [Op.iLike]: `%${options.filter.search}%` } },
-                { fullName: { [Op.iLike]: `%${options.filter.search}%` } },
-            ];
-        }
-
-        const findOptions = buildBaseFindOptions(options);
         const { count, rows } = await User.findAndCountAll({
             ...findOptions,
-            where,
             attributes: { exclude: ['passwordHash', 'createdAt', 'updatedAt'] },
             order: findOptions.order || [['createdAt', 'DESC']],
         });
 
         return { items: rows, total: count };
+    }
+
+    async buildGetUsersFindOptions(
+        options?: IGetOptions<GetUsersFilterSchemaType>
+    ): Promise<FindOptions> {
+        const findOptions = buildBaseFindOptions(options);
+        findOptions.where = {};
+        const filters = options?.filter;
+
+        if (filters?.search) {
+            // @ts-expect-error
+            findOptions.where[Op.or] = [
+                { email: { [Op.iLike]: `%${filters.search}%` } },
+                { fullName: { [Op.iLike]: `%${filters.search}%` } },
+            ];
+        }
+
+        if (filters?.teamId) {
+            let members = await TeamMembership.findAll({
+                where: { teamId: filters.teamId },
+                attributes: ['userId'],
+            });
+            const userIds = members.map((m: TeamMembership) => m.userId);
+            findOptions.where.id = { [Op.in]: userIds };
+        }
+
+        return findOptions;
     }
 
     async createUser(
